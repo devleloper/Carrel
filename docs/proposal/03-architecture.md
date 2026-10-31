@@ -204,6 +204,8 @@ public actor NotebookStore {
     private let package: NotebookPackage
     private var manifest: NotebookManifest
     private var writtenInkHashes: [Page.ID: InkHash] = [:]
+    /// Pages whose ink needs a newer PencilKit than this system has; filled when `ink(for:)` loads them.
+    private var readOnlyPages: Set<Page.ID> = []
     private let changesContinuation: AsyncStream<NotebookChange>.Continuation
 
     public init(package: NotebookPackage, manifest: NotebookManifest) {
@@ -216,6 +218,9 @@ public actor NotebookStore {
     }
 
     public func saveInk(_ ink: InkData, for pageID: Page.ID) throws {
+        guard !readOnlyPages.contains(pageID) else {
+            throw NotebookStoreError.requiresNewerSystem
+        }
         let envelope = InkEnvelope(ink)
         guard writtenInkHashes[pageID] != envelope.payloadHash else {
             return
