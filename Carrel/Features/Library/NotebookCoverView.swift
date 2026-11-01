@@ -47,14 +47,15 @@ struct NotebookCoverView: View {
 
     /// Leather catches more light than cloth or paper, so its sheen is stronger.
     private var materialShading: LinearGradient {
-        let highlight = switch appearance.material {
-        case .leather:
-            0.16
-        case .cloth, .linen:
-            0.08
-        case .kraft, .plain:
-            0.05
-        }
+        let highlight =
+            switch appearance.material {
+            case .leather:
+                0.16
+            case .cloth, .linen:
+                0.08
+            case .kraft, .plain:
+                0.05
+            }
         return LinearGradient(
             colors: [.white.opacity(highlight), .clear, .black.opacity(highlight)],
             startPoint: .topLeading,

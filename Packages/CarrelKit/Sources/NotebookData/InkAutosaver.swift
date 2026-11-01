@@ -59,8 +59,12 @@ public final class InkAutosaver {
         guard let firstUnsavedChange, let lastChange else {
             return
         }
-        let deadline = delay.map { ContinuousClock.now + $0 }
-            ?? policy.saveDeadline(firstUnsavedChange: firstUnsavedChange, lastChange: lastChange)
+        let deadline: ContinuousClock.Instant
+        if let delay {
+            deadline = .now + delay
+        } else {
+            deadline = policy.saveDeadline(firstUnsavedChange: firstUnsavedChange, lastChange: lastChange)
+        }
         scheduledSave?.cancel()
         scheduledSave = Task { [weak self] in
             try? await Task.sleep(until: deadline, clock: .continuous)

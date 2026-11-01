@@ -41,10 +41,12 @@ struct SettingsView: View {
                     }
                 }
             } message: {
-                Text("""
+                Text(
+                    """
                     Your current library is replaced by the backup. \
                     It is kept in the recovery folder, not deleted.
-                    """)
+                    """
+                )
             }
             .alert("Something Went Wrong", isPresented: Binding(presenting: $backup.errorMessage)) {
                 Button("OK", role: .cancel) {}
@@ -84,10 +86,12 @@ struct SettingsView: View {
         } header: {
             Text("Data")
         } footer: {
-            Text("""
+            Text(
+                """
                 Notebooks are stored on this iPad and saved as you write. \
                 A backup is a single file you can keep in Files or on another device.
-                """)
+                """
+            )
         }
     }
 
@@ -99,10 +103,12 @@ struct SettingsView: View {
         } header: {
             Text("Writing")
         } footer: {
-            Text("""
+            Text(
+                """
                 Follows Settings › Apple Pencil › Only Draw with Apple Pencil. \
                 When fingers can draw, scroll with two fingers.
-                """)
+                """
+            )
         }
     }
 

@@ -35,10 +35,9 @@ final class LibraryModel {
 
     var visibleNotebooks: [Notebook] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        return notebooks
-            .filter(isInCurrentSection)
-            .filter { query.isEmpty || $0.title.localizedStandardContains(query) }
-            .sorted { $0.modifiedAt > $1.modifiedAt }
+        let inSection = notebooks.filter(isInCurrentSection)
+        let matching = query.isEmpty ? inSection : inSection.filter { $0.title.localizedStandardContains(query) }
+        return matching.sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
     var sectionTitle: String {

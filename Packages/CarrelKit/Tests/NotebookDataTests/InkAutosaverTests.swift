@@ -33,7 +33,7 @@ struct InkAutosaverTests {
         source.inks[fixture.pageID] = .sample(seed: 2)
         await autosaver.flush()
 
-        #expect(await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
+        #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
         #expect(autosaver.status == .saved)
     }
 
@@ -62,7 +62,7 @@ struct InkAutosaverTests {
         try await Task.sleep(for: .milliseconds(500))
 
         #expect(autosaver.status == .saved)
-        #expect(await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 3)))
+        #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 3)))
     }
 
     @Test func overlappingFlushesNeverLeaveOlderInkOnDisk() async throws {
@@ -79,7 +79,7 @@ struct InkAutosaverTests {
         await autosaver.flush()
         await firstFlush
 
-        #expect(await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
+        #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
     }
 
     @Test func failedWritesAreReportedAndRetried() async throws {
