@@ -16,7 +16,7 @@ struct PageStackLayout: Equatable {
     init(pageSizes: [PageSize], containerWidth: CGFloat, zoom: CGFloat, metrics: Metrics = Metrics()) {
         let widest = pageSizes.map { CGFloat($0.width) }.max() ?? CGFloat(PageSize.a4.width)
         let fitScale = max((containerWidth - metrics.horizontalMargin * 2) / widest, 0.1)
-        scale = fitScale * zoom
+        let scale = fitScale * zoom
 
         let sizes = pageSizes.map { CGSize(width: CGFloat($0.width) * scale, height: CGFloat($0.height) * scale) }
         let contentWidth = max(containerWidth, (sizes.map(\.width).max() ?? 0) + metrics.horizontalMargin * 2)
@@ -26,6 +26,7 @@ struct PageStackLayout: Equatable {
             frames.append(CGRect(x: (contentWidth - size.width) / 2, y: y, width: size.width, height: size.height))
             y += size.height + metrics.pageSpacing
         }
+        self.scale = scale
         pageFrames = frames
         contentSize = CGSize(width: contentWidth, height: y)
     }
