@@ -19,6 +19,13 @@
 			remoteGlobalIDString = CA0000000000000000000301;
 			remoteInfo = Carrel;
 		};
+		CA0000000000000000000202 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CA0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CA0000000000000000000301;
+			remoteInfo = Carrel;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +37,8 @@
 		CA0000000000000000000406 /* Carrel.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Carrel.xcconfig; sourceTree = "<group>"; };
 		CA0000000000000000000407 /* CarrelUITests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CarrelUITests.xcconfig; sourceTree = "<group>"; };
 		CA0000000000000000000408 /* Carrel-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Carrel-Info.plist"; sourceTree = "<group>"; };
+		CA0000000000000000000409 /* CarrelTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarrelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA000000000000000000040A /* CarrelTests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CarrelTests.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -41,6 +50,11 @@
 		CA0000000000000000000602 /* CarrelUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CarrelUITests;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000603 /* CarrelTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CarrelTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -62,6 +76,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA0000000000000000000703 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -69,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				CA0000000000000000000601 /* Carrel */,
+				CA0000000000000000000603 /* CarrelTests */,
 				CA0000000000000000000602 /* CarrelUITests */,
 				CA0000000000000000000802 /* Config */,
 				CA0000000000000000000803 /* Products */,
@@ -82,6 +104,7 @@
 				CA0000000000000000000404 /* Debug.xcconfig */,
 				CA0000000000000000000405 /* Release.xcconfig */,
 				CA0000000000000000000406 /* Carrel.xcconfig */,
+				CA000000000000000000040A /* CarrelTests.xcconfig */,
 				CA0000000000000000000407 /* CarrelUITests.xcconfig */,
 				CA0000000000000000000408 /* Carrel-Info.plist */,
 			);
@@ -92,6 +115,7 @@
 			isa = PBXGroup;
 			children = (
 				CA0000000000000000000401 /* Carrel.app */,
+				CA0000000000000000000409 /* CarrelTests.xctest */,
 				CA0000000000000000000402 /* CarrelUITests.xctest */,
 			);
 			name = Products;
@@ -147,6 +171,29 @@
 			productReference = CA0000000000000000000402 /* CarrelUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		CA0000000000000000000303 /* CarrelTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CA0000000000000000000B03 /* Build configuration list for PBXNativeTarget "CarrelTests" */;
+			buildPhases = (
+				CA0000000000000000000903 /* Sources */,
+				CA0000000000000000000703 /* Frameworks */,
+				CA0000000000000000000A03 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CA0000000000000000000C02 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CA0000000000000000000603 /* CarrelTests */,
+			);
+			name = CarrelTests;
+			packageProductDependencies = (
+			);
+			productName = CarrelTests;
+			productReference = CA0000000000000000000409 /* CarrelTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -161,6 +208,10 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					CA0000000000000000000302 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = CA0000000000000000000301;
+					};
+					CA0000000000000000000303 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = CA0000000000000000000301;
 					};
@@ -184,6 +235,7 @@
 			projectRoot = "";
 			targets = (
 				CA0000000000000000000301 /* Carrel */,
+				CA0000000000000000000303 /* CarrelTests */,
 				CA0000000000000000000302 /* CarrelUITests */,
 			);
 		};
@@ -198,6 +250,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		CA0000000000000000000A02 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CA0000000000000000000A03 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -221,6 +280,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA0000000000000000000903 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -228,6 +294,11 @@
 			isa = PBXTargetDependency;
 			target = CA0000000000000000000301 /* Carrel */;
 			targetProxy = CA0000000000000000000201 /* PBXContainerItemProxy */;
+		};
+		CA0000000000000000000C02 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CA0000000000000000000301 /* Carrel */;
+			targetProxy = CA0000000000000000000202 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -274,6 +345,20 @@
 			};
 			name = Release;
 		};
+		CA0000000000000000000E07 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA000000000000000000040A /* CarrelTests.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		CA0000000000000000000E08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CA000000000000000000040A /* CarrelTests.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -300,6 +385,15 @@
 			buildConfigurations = (
 				CA0000000000000000000E05 /* Debug */,
 				CA0000000000000000000E06 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CA0000000000000000000B03 /* Build configuration list for PBXNativeTarget "CarrelTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA0000000000000000000E07 /* Debug */,
+				CA0000000000000000000E08 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

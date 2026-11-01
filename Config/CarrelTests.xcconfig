@@ -1,0 +1,8 @@
+// Unit tests run inside the app, so they can test app code with @testable import.
+
+PRODUCT_NAME = CarrelTests
+PRODUCT_BUNDLE_IDENTIFIER = dev.devlet.notebook.tests
+GENERATE_INFOPLIST_FILE = YES
+TEST_HOST = $(BUILT_PRODUCTS_DIR)/Carrel.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Carrel
+BUNDLE_LOADER = $(TEST_HOST)
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks
