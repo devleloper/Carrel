@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the app and runs the UI tests on the newest iPad simulator. CI runs exactly this script.
+# Builds the app and runs its unit and UI tests on the newest iPad simulator. CI runs exactly this script.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,9 +20,18 @@ if [[ -z "$destination_id" ]]; then
 fi
 
 rm -rf build/Carrel.xcresult
+mkdir -p build
+set +e
 xcodebuild test \
   -project Carrel.xcodeproj \
   -scheme Carrel \
   -destination "id=$destination_id" \
   -resultBundlePath build/Carrel.xcresult \
-  CODE_SIGNING_ALLOWED=NO
+  CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/xcodebuild.log
+status=${PIPESTATUS[0]}
+set -e
+
+# Compiler warnings scroll by in thousands of lines of output; repeat them at the end where they are seen.
+echo "Compiler warnings in project sources:"
+grep -E "^$PWD/.*\.swift:[0-9]+:[0-9]+: warning:" build/xcodebuild.log | sed "s#^$PWD/##" | sort -u || echo "none"
+exit "$status"

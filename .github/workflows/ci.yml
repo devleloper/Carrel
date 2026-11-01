@@ -11,9 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Lint, package tests, app build and UI tests
+  lint:
+    name: Lint
     # GitHub's image with Xcode 27 and iPadOS 27 simulators (public preview as of October 2026).
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: Scripts/lint.sh
+
+  test:
+    name: Package tests, app build, unit and UI tests
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
@@ -24,13 +33,10 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Lint
-        run: Scripts/lint.sh
-
       - name: Package tests
         run: swift test --package-path Packages/CarrelKit
 
-      - name: Build and UI tests
+      - name: Build and test the app
         run: Scripts/test.sh
 
       - name: Upload test results

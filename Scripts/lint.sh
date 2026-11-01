@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Style and hygiene checks. Formatting findings are reported; the grep rules below fail the build.
+# Style and hygiene checks. Any formatting finding or grep rule below fails the build.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-sources=(Carrel CarrelUITests Packages/CarrelKit)
+sources=(Carrel CarrelTests CarrelUITests Packages/CarrelKit)
 
 if xcrun --find swift-format >/dev/null 2>&1; then
-  xcrun swift-format lint --recursive --configuration .swift-format "${sources[@]}"
+  xcrun swift-format lint --strict --recursive --configuration .swift-format "${sources[@]}"
 else
   echo "swift-format is not available in this toolchain; skipping formatting checks." >&2
 fi
