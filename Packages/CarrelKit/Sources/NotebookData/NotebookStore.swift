@@ -31,7 +31,12 @@ public actor NotebookStore {
     private var readOnlyPages: Set<Page.ID> = []
     private var hasUnwrittenManifestChanges = false
 
-    private init(package: NotebookPackage, manifest: NotebookManifest, supportedContentVersion: Int, recoveredDirectory: URL) {
+    private init(
+        package: NotebookPackage,
+        manifest: NotebookManifest,
+        supportedContentVersion: Int,
+        recoveredDirectory: URL
+    ) {
         self.package = package
         self.manifest = manifest
         self.supportedContentVersion = supportedContentVersion
@@ -66,11 +71,7 @@ public actor NotebookStore {
         let package = NotebookPackage(url: url)
         var manifest = try readManifest(of: package)
         if adoptOrphanInk(in: package, into: &manifest, now: now) {
-            try FileManager.default.replaceContents(
-                of: package.manifestURL,
-                with: JSONCoding.encode(manifest),
-                keepingPreviousAt: package.previousManifestURL
-            )
+            try VersionedFile.write(manifest, to: package.manifestURL, keepingPreviousAt: package.previousManifestURL)
         }
         return NotebookStore(
             package: package,
@@ -80,26 +81,26 @@ public actor NotebookStore {
         )
     }
 
-    /// Reads the manifest, falling back to the previous generation when the current one is unreadable.
     static func readManifest(of package: NotebookPackage) throws -> NotebookManifest {
-        for url in [package.manifestURL, package.previousManifestURL] {
-            guard let data = try? Data(contentsOf: url) else {
-                continue
-            }
-            if let probe = try? JSONCoding.decode(SchemaProbe.self, from: data),
-                probe.schemaVersion > NotebookManifest.currentSchemaVersion
-            {
-                throw NotebookStoreError.schemaNewerThanApp
-            }
-            if let manifest = try? JSONCoding.decode(NotebookManifest.self, from: data) {
-                return manifest
-            }
+        do {
+            return try VersionedFile.read(
+                NotebookManifest.self,
+                from: [package.manifestURL, package.previousManifestURL],
+                supportedSchemaVersion: NotebookManifest.currentSchemaVersion
+            )
+        } catch VersionedFileError.newerSchema {
+            throw NotebookStoreError.schemaNewerThanApp
+        } catch {
+            throw NotebookStoreError.manifestUnreadable
         }
-        throw NotebookStoreError.manifestUnreadable
     }
 
     /// Ink files without a manifest entry come from a crash between two writes; they become pages at the end.
-    private static func adoptOrphanInk(in package: NotebookPackage, into manifest: inout NotebookManifest, now: Date) -> Bool {
+    private static func adoptOrphanInk(
+        in package: NotebookPackage,
+        into manifest: inout NotebookManifest,
+        now: Date
+    ) -> Bool {
         let knownPages = Set(manifest.pages.map(\.id))
         let orphans = FileManager.default.directoryContents(at: package.inkDirectory)
             .filter { $0.pathExtension == "ink" }
@@ -128,7 +129,7 @@ public actor NotebookStore {
 
     // MARK: Ink
 
-    public func ink(for pageID: Page.ID) -> InkLoadResult {
+    public func ink(for pageID: Page.ID, now: Date = .now) -> InkLoadResult {
         guard let page = manifest.pages.first(where: { $0.id == pageID }) else {
             return .empty
         }
@@ -144,13 +145,13 @@ public actor NotebookStore {
             return .empty
         }
         if case .failure(.damaged) = current {
-            quarantine(currentURL, pageID: pageID)
+            quarantine(currentURL, pageID: pageID, now: now)
         }
         if case .success(let ink) = readInk(at: previousURL) {
             return accept(ink, for: pageID, isRecovered: true)
         }
         if hasPreviousGeneration {
-            quarantine(previousURL, pageID: pageID)
+            quarantine(previousURL, pageID: pageID, now: now)
         }
         return .unrecoverable
     }
@@ -207,12 +208,11 @@ public actor NotebookStore {
 
     /// Permanently removes pages that have been in the Trash since before `cutoff`.
     public func purgePages(deletedBefore cutoff: Date) throws {
-        let expired = manifest.pages.filter { ($0.deletedAt ?? .distantFuture) < cutoff }.map(\.id)
+        let expired = Set(manifest.pages.filter { ($0.deletedAt ?? .distantFuture) < cutoff }.map(\.id))
         guard !expired.isEmpty else {
             return
         }
-        let expiredSet = Set(expired)
-        try updateManifest { $0.pages.removeAll { expiredSet.contains($0.id) } }
+        try updateManifest { $0.pages.removeAll { expired.contains($0.id) } }
         for pageID in expired {
             try? FileManager.default.removeItem(at: package.inkURL(for: pageID))
             try? FileManager.default.removeItem(at: package.previousInkURL(for: pageID))
@@ -220,11 +220,7 @@ public actor NotebookStore {
     }
 
     private func writeManifest(_ updated: NotebookManifest) throws {
-        try FileManager.default.replaceContents(
-            of: package.manifestURL,
-            with: JSONCoding.encode(updated),
-            keepingPreviousAt: package.previousManifestURL
-        )
+        try VersionedFile.write(updated, to: package.manifestURL, keepingPreviousAt: package.previousManifestURL)
         manifest = updated
         hasUnwrittenManifestChanges = false
     }
@@ -257,12 +253,14 @@ public actor NotebookStore {
     }
 
     /// Copies a damaged file aside so a later write cannot destroy what might still be salvaged.
-    private func quarantine(_ url: URL, pageID: Page.ID) {
-        let fileManager = FileManager.default
-        let destination = recoveredDirectory.appending(
-            path: "\(manifest.notebook.id.uuidString)-\(pageID.uuidString)-\(Int(Date.now.timeIntervalSince1970))-\(url.lastPathComponent)"
-        )
-        try? fileManager.createDirectory(at: recoveredDirectory, withIntermediateDirectories: true)
-        try? fileManager.copyItem(at: url, to: destination)
+    private func quarantine(_ url: URL, pageID: Page.ID, now: Date) {
+        let name = [
+            manifest.notebook.id.uuidString,
+            pageID.uuidString,
+            String(Int(now.timeIntervalSince1970)),
+            url.lastPathComponent,
+        ].joined(separator: "-")
+        try? FileManager.default.createDirectory(at: recoveredDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.copyItem(at: url, to: recoveredDirectory.appending(path: name))
     }
 }

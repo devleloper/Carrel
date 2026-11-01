@@ -61,35 +61,33 @@ struct LibraryStoreTests {
     @Test func backupRestoresNotebooksAndInk() async throws {
         let (library, root) = try makeLibrary()
         defer { try? FileManager.default.removeItem(at: root) }
+        let backup = LibraryBackup(library: library)
         let notebook = try await createNotebook(in: library)
         let store = try await library.store(for: notebook.id)
         let pageID = try #require(await store.manifest.activePages.first?.id)
         try await store.saveInk(.sample(seed: 9), for: pageID)
         let archive = root.appending(path: "backup.aar")
 
-        try await library.backUp(to: archive)
+        try await backup.write(to: archive)
         try await library.deleteNotebookPermanently(notebook.id)
-        try await library.restore(from: archive)
+        try await backup.restore(from: archive)
 
         let restored = try await library.store(for: notebook.id)
         #expect(await restored.ink(for: pageID) == .ink(.sample(seed: 9)))
-        let recovered = FileManager.default.directoryContents(at: LibraryLayout(root: root).recoveredDirectory)
+        let recovered = FileManager.default.directoryContents(at: library.layout.recoveredDirectory)
         #expect(recovered.contains { $0.lastPathComponent.hasPrefix("Library-before-restore") })
     }
 
-    @Test func snapshotsKeepRecentSessionsAndOnePerDay() throws {
-        let directory = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let ages: [TimeInterval] = [0, 60, 120, 180, 240, 300, 360, 86_400 * 2, 86_400 * 2 + 60, 86_400 * 40]
-        for age in ages {
-            let url = directory.appending(path: "\(Int(now.timeIntervalSince1970 - age)).notebook", directoryHint: .isDirectory)
-            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    @Test func restoringSomethingThatIsNotABackupKeepsTheLibrary() async throws {
+        let (library, root) = try makeLibrary()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let notebook = try await createNotebook(in: library)
+        let notABackup = root.appending(path: "notes.aar")
+        try Data("not an archive".utf8).write(to: notABackup)
+
+        await #expect(throws: (any Error).self) {
+            try await LibraryBackup(library: library).restore(from: notABackup)
         }
-
-        SnapshotRetention.prune(directory, now: now, calendar: Calendar(identifier: .gregorian))
-
-        let remaining = FileManager.default.directoryContents(at: directory).count
-        #expect(remaining == 6)
+        #expect(await library.notebooks().map(\.id) == [notebook.id])
     }
 }

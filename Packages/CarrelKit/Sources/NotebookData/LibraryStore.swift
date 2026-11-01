@@ -3,11 +3,10 @@ import NotebookDomain
 
 public enum LibraryStoreError: Error, Equatable {
     case notebookNotFound
-    case insufficientSpace
-    case backupUnreadable
+    case schemaNewerThanApp
 }
 
-/// Folders, the list of notebooks, and the single `NotebookStore` per open notebook.
+/// The catalog of the library: folders, the list of notebooks, and the single `NotebookStore` per open notebook.
 ///
 /// Every change to a notebook goes through its `NotebookStore`, even a rename from the library, so the editor
 /// and the library never hold two diverging copies of the same manifest.
@@ -20,22 +19,40 @@ public actor LibraryStore {
     private var openStores: [Notebook.ID: NotebookStore] = [:]
 
     public init(layout: LibraryLayout, supportedContentVersion: Int) throws {
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: layout.notebooksDirectory, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: layout.recoveredDirectory, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: layout.snapshotsDirectory, withIntermediateDirectories: true)
+        for directory in [layout.notebooksDirectory, layout.recoveredDirectory, layout.snapshotsDirectory] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
         self.layout = layout
         self.supportedContentVersion = supportedContentVersion
-        self.manifest = Self.readManifest(layout)
+        self.manifest = try Self.readManifest(layout)
     }
 
-    private static func readManifest(_ layout: LibraryLayout) -> LibraryManifest {
-        for url in [layout.manifestURL, layout.previousManifestURL] {
-            if let data = try? Data(contentsOf: url), let manifest = try? JSONCoding.decode(LibraryManifest.self, from: data) {
-                return manifest
-            }
+    /// A missing or unreadable `library.json` costs only folder names, never notebooks, so it starts empty.
+    private static func readManifest(_ layout: LibraryLayout) throws -> LibraryManifest {
+        do {
+            return try VersionedFile.read(
+                LibraryManifest.self,
+                from: [layout.manifestURL, layout.previousManifestURL],
+                supportedSchemaVersion: LibraryManifest.currentSchemaVersion
+            )
+        } catch VersionedFileError.newerSchema {
+            throw LibraryStoreError.schemaNewerThanApp
+        } catch {
+            return LibraryManifest()
         }
-        return LibraryManifest()
+    }
+
+    /// Forgets open notebooks and reads the library again, after its files were replaced by a restore.
+    public func reload() throws {
+        openStores.removeAll()
+        manifest = try Self.readManifest(layout)
+    }
+
+    /// Writes changes that open notebooks keep in memory, so the files on disk are complete.
+    public func writePendingChanges() async throws {
+        for store in openStores.values {
+            try await store.writePendingManifestChanges()
+        }
     }
 
     // MARK: Notebooks
@@ -43,7 +60,9 @@ public actor LibraryStore {
     /// Every readable notebook, including those in the Trash. Unreadable packages are skipped, not deleted.
     public func notebooks() async -> [Notebook] {
         var notebooks: [Notebook] = []
-        for url in FileManager.default.directoryContents(at: layout.notebooksDirectory) where url.pathExtension == "notebook" {
+        let packages = FileManager.default.directoryContents(at: layout.notebooksDirectory)
+            .filter { $0.pathExtension == "notebook" }
+        for url in packages {
             guard let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) else {
                 continue
             }
@@ -75,14 +94,13 @@ public actor LibraryStore {
             now: now
         )
         let firstPage = Page(sortKey: .initial, size: pageSize, paper: paper, now: now)
-        let store = try NotebookStore.create(
+        openStores[notebook.id] = try NotebookStore.create(
             notebook,
             firstPage: firstPage,
             at: layout.packageURL(for: notebook.id),
             supportedContentVersion: supportedContentVersion,
             recoveredDirectory: layout.recoveredDirectory
         )
-        openStores[notebook.id] = store
         return notebook
     }
 
@@ -104,9 +122,12 @@ public actor LibraryStore {
     }
 
     @discardableResult
-    public func updateNotebook(_ notebookID: Notebook.ID, now: Date = .now, _ change: @escaping @Sendable (inout Notebook) -> Void) async throws -> Notebook {
-        let store = try store(for: notebookID)
-        let manifest = try await store.updateManifest { manifest in
+    public func updateNotebook(
+        _ notebookID: Notebook.ID,
+        now: Date = .now,
+        _ change: @escaping @Sendable (inout Notebook) -> Void
+    ) async throws -> Notebook {
+        let manifest = try await store(for: notebookID).updateManifest { manifest in
             change(&manifest.notebook)
             manifest.notebook.modifiedAt = now
         }
@@ -139,20 +160,18 @@ public actor LibraryStore {
 
     public func createFolder(title: String, now: Date = .now) throws -> Folder {
         let folder = Folder(title: title, sortKey: SortKey.between(folders().last?.sortKey, nil), now: now)
-        var updated = manifest
-        updated.folders.append(folder)
-        try writeManifest(updated)
+        try updateFolders { $0.append(folder) }
         return folder
     }
 
     public func renameFolder(_ folderID: Folder.ID, to title: String, now: Date = .now) throws {
-        var updated = manifest
-        guard let index = updated.folders.firstIndex(where: { $0.id == folderID }) else {
-            return
+        try updateFolders { folders in
+            guard let index = folders.firstIndex(where: { $0.id == folderID }) else {
+                return
+            }
+            folders[index].title = title
+            folders[index].modifiedAt = now
         }
-        updated.folders[index].title = title
-        updated.folders[index].modifiedAt = now
-        try writeManifest(updated)
     }
 
     /// Deletes a folder; its notebooks move to the top level rather than disappearing with it.
@@ -160,105 +179,18 @@ public actor LibraryStore {
         for notebook in await notebooks() where notebook.folderID == folderID {
             try await updateNotebook(notebook.id, now: now) { $0.folderID = nil }
         }
+        try updateFolders { folders in
+            guard let index = folders.firstIndex(where: { $0.id == folderID }) else {
+                return
+            }
+            folders[index].deletedAt = now
+        }
+    }
+
+    private func updateFolders(_ change: (inout [Folder]) -> Void) throws {
         var updated = manifest
-        guard let index = updated.folders.firstIndex(where: { $0.id == folderID }) else {
-            return
-        }
-        updated.folders[index].deletedAt = now
-        try writeManifest(updated)
-    }
-
-    private func writeManifest(_ updated: LibraryManifest) throws {
-        try FileManager.default.replaceContents(
-            of: layout.manifestURL,
-            with: JSONCoding.encode(updated),
-            keepingPreviousAt: layout.previousManifestURL
-        )
+        change(&updated.folders)
+        try VersionedFile.write(updated, to: layout.manifestURL, keepingPreviousAt: layout.previousManifestURL)
         manifest = updated
-    }
-
-    // MARK: Snapshots
-
-    /// Keeps a copy of a notebook as it was before an editing session; on APFS the copy is a cheap clone.
-    public func takeSnapshot(of notebookID: Notebook.ID, now: Date = .now) async throws {
-        if let store = openStores[notebookID] {
-            try await store.writePendingManifestChanges()
-        }
-        let directory = layout.snapshotsDirectory(for: notebookID)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appending(path: "\(Int(now.timeIntervalSince1970)).notebook", directoryHint: .isDirectory)
-        guard !FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) else {
-            return
-        }
-        try FileManager.default.copyItem(at: layout.packageURL(for: notebookID), to: destination)
-        SnapshotRetention.prune(directory, now: now)
-    }
-
-    // MARK: Backup
-
-    /// Writes the whole library into one Apple Archive file at `destination`.
-    public func backUp(to destination: URL) async throws {
-        for store in openStores.values {
-            try await store.writePendingManifestChanges()
-        }
-        let required = FileManager.default.allocatedSize(ofDirectory: layout.library)
-        let available = (try? layout.root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-            .volumeAvailableCapacityForImportantUsage ?? .max
-        guard available > required else {
-            throw LibraryStoreError.insufficientSpace
-        }
-        try LibraryArchive.write(directory: layout.library, to: destination)
-    }
-
-    /// Replaces the library with a backup. The current library is moved to the recovery folder first.
-    public func restore(from archive: URL, now: Date = .now) throws {
-        let fileManager = FileManager.default
-        let staging = layout.root.appending(path: "Restoring-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
-        defer { try? fileManager.removeItem(at: staging) }
-
-        try LibraryArchive.extract(archive, into: staging)
-        let restoredNotebooks = staging.appending(path: "Notebooks", directoryHint: .isDirectory)
-        guard fileManager.fileExists(atPath: restoredNotebooks.path(percentEncoded: false)) else {
-            throw LibraryStoreError.backupUnreadable
-        }
-
-        openStores.removeAll()
-        let replaced = layout.recoveredDirectory.appending(
-            path: "Library-before-restore-\(Int(now.timeIntervalSince1970))",
-            directoryHint: .isDirectory
-        )
-        try fileManager.moveItem(at: layout.library, to: replaced)
-        try fileManager.moveItem(at: staging, to: layout.library)
-        manifest = Self.readManifest(layout)
-    }
-}
-
-/// Keeps the five most recent snapshots plus the newest one of each day for thirty days.
-enum SnapshotRetention {
-    static let recentCount = 5
-    static let dailyWindow: TimeInterval = 30 * 24 * 60 * 60
-
-    static func prune(_ directory: URL, now: Date, calendar: Calendar = .current) {
-        let snapshots = FileManager.default.directoryContents(at: directory)
-            .compactMap { url -> (url: URL, date: Date)? in
-                guard let seconds = TimeInterval(url.deletingPathExtension().lastPathComponent) else {
-                    return nil
-                }
-                return (url, Date(timeIntervalSince1970: seconds))
-            }
-            .sorted { $0.date > $1.date }
-
-        var keep = Set(snapshots.prefix(recentCount).map(\.url))
-        var keptDays = Set<DateComponents>()
-        for snapshot in snapshots where now.timeIntervalSince(snapshot.date) <= dailyWindow {
-            let day = calendar.dateComponents([.year, .month, .day], from: snapshot.date)
-            if keptDays.insert(day).inserted {
-                keep.insert(snapshot.url)
-            }
-        }
-        for snapshot in snapshots where !keep.contains(snapshot.url) {
-            try? FileManager.default.removeItem(at: snapshot.url)
-        }
     }
 }

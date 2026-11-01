@@ -7,15 +7,19 @@ public struct AutosavePolicy: Sendable {
     public var maximumDelay: Duration
     /// Extra time before a pending save is reported as stalled rather than routine.
     public var stallMargin: Duration
+    /// Wait before writing again after a failed write, for example while the disk is full.
+    public var retryDelay: Duration
 
     public init(
         idleDelay: Duration = .seconds(2),
         maximumDelay: Duration = .seconds(5),
-        stallMargin: Duration = .seconds(2)
+        stallMargin: Duration = .seconds(2),
+        retryDelay: Duration = .seconds(5)
     ) {
         self.idleDelay = idleDelay
         self.maximumDelay = maximumDelay
         self.stallMargin = stallMargin
+        self.retryDelay = retryDelay
     }
 
     public func saveDeadline(

@@ -5,14 +5,18 @@ import NotebookDomain
 
 /// A fresh directory per test, removed by the caller with `defer`.
 func makeTemporaryDirectory() throws -> URL {
-    let url = FileManager.default.temporaryDirectory.appending(path: "CarrelTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let url = FileManager.default.temporaryDirectory.appending(
+        path: "CarrelTests-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
 
 extension InkData {
     static func sample(seed: UInt8, contentVersion: Int = 4) -> InkData {
-        InkData(payload: Data((0..<256).map { UInt8(truncatingIfNeeded: Int($0) &* Int(seed) &+ 7) }), requiredContentVersion: contentVersion)
+        let payload = Data((0..<256).map { UInt8(truncatingIfNeeded: $0 &* Int(seed) &+ 7) })
+        return InkData(payload: payload, requiredContentVersion: contentVersion)
     }
 }
 
