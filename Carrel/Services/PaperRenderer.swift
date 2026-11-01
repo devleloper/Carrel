@@ -11,14 +11,24 @@ enum PaperRenderer {
         let background: UIColor
         let ruleLine: UIColor
         let marginLine: UIColor
+
+        init(background: UInt32, ruleLine: UInt32, marginLine: UInt32) {
+            self.background = UIColor(hex: background)
+            self.ruleLine = UIColor(hex: ruleLine)
+            self.marginLine = UIColor(hex: marginLine)
+        }
     }
 
     static func colors(for tone: PaperTone) -> ToneColors {
         switch tone {
-        case .white: ToneColors(background: UIColor(hex: 0xFCFCFA), ruleLine: UIColor(hex: 0xD5DCE6), marginLine: UIColor(hex: 0xEDC1B3))
-        case .cream: ToneColors(background: UIColor(hex: 0xF6EEDC), ruleLine: UIColor(hex: 0xDCCFB5), marginLine: UIColor(hex: 0xE9B79E))
-        case .linen: ToneColors(background: UIColor(hex: 0xECE8E0), ruleLine: UIColor(hex: 0xD3CCBF), marginLine: UIColor(hex: 0xE2B3A1))
-        case .night: ToneColors(background: UIColor(hex: 0x22211F), ruleLine: UIColor(hex: 0x3A3835), marginLine: UIColor(hex: 0x5B3931))
+        case .white:
+            ToneColors(background: 0xFCFCFA, ruleLine: 0xD5DCE6, marginLine: 0xEDC1B3)
+        case .cream:
+            ToneColors(background: 0xF6EEDC, ruleLine: 0xDCCFB5, marginLine: 0xE9B79E)
+        case .linen:
+            ToneColors(background: 0xECE8E0, ruleLine: 0xD3CCBF, marginLine: 0xE2B3A1)
+        case .night:
+            ToneColors(background: 0x22211F, ruleLine: 0x3A3835, marginLine: 0x5B3931)
         }
     }
 
@@ -63,7 +73,8 @@ enum PaperRenderer {
             context.setFillColor(colors.ruleLine.cgColor)
             for x in stride(from: spacing, to: width, by: spacing) {
                 for y in stride(from: spacing, to: height, by: spacing) {
-                    context.fillEllipse(in: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2))
+                    let dot = CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)
+                    context.fillEllipse(in: dot)
                 }
             }
         }

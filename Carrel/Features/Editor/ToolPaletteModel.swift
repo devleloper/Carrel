@@ -105,7 +105,16 @@ final class ToolPaletteModel {
     }
 
     func toggleEraser() {
-        selection == .eraser ? selectPrevious() : select(.eraser)
+        if selection == .eraser {
+            selectPrevious()
+        } else {
+            select(.eraser)
+        }
+    }
+
+    /// Every tool in palette order: the favorite pens, then highlighter, eraser and lasso.
+    var tools: [EditorTool] {
+        settings.pens.indices.map(EditorTool.pen) + [.highlighter, .eraser, .lasso]
     }
 
     func pen(at index: Int) -> PenSettings? {
@@ -120,7 +129,10 @@ final class ToolPaletteModel {
         case .highlighter:
             return PKInkingTool(.marker, color: UIColor(hex: settings.highlighterHex), width: settings.highlighterWidth)
         case .eraser:
-            return settings.isPreciseEraser ? PKEraserTool(.bitmap, width: settings.eraserWidth) : PKEraserTool(.vector)
+            if settings.isPreciseEraser {
+                return PKEraserTool(.bitmap, width: settings.eraserWidth)
+            }
+            return PKEraserTool(.vector)
         case .lasso:
             return PKLassoTool()
         }

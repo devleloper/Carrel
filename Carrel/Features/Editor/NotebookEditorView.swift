@@ -8,8 +8,7 @@ struct NotebookEditorView: View {
     @State private var quickPaletteLocation: CGPoint?
     @State private var isShowingOverview = false
     @State private var exportedFile: SharedFile?
-    @State private var isRenaming = false
-    @State private var titleDraft = ""
+    @State private var renameDraft: String?
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -25,7 +24,16 @@ struct NotebookEditorView: View {
             .ignoresSafeArea()
             .overlay { quickPalette }
         }
-        .safeAreaInset(edge: .top) { topBar }
+        .safeAreaInset(edge: .top) {
+            EditorTopBar(
+                session: session,
+                palette: palette,
+                onClose: close,
+                onShowOverview: { isShowingOverview = true },
+                onRename: { renameDraft = session.notebook.title },
+                onExport: { Task { await exportPDF() } }
+            )
+        }
         .overlay(alignment: .leading) {
             ToolPaletteView(palette: palette)
                 .padding(.leading, Theme.Spacing.l)
@@ -37,143 +45,45 @@ struct NotebookEditorView: View {
         .sheet(item: $exportedFile) { file in
             ActivityView(items: [file.url])
         }
-        .alert("Rename Notebook", isPresented: $isRenaming) {
-            TextField("Title", text: $titleDraft)
+        .alert("Rename Notebook", isPresented: Binding(presenting: $renameDraft)) {
+            TextField("Title", text: Binding(get: { renameDraft ?? "" }, set: { renameDraft = $0 }))
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
-                Task { try? await session.rename(to: titleDraft) }
+                let title = renameDraft ?? ""
+                Task { try? await session.rename(to: title) }
             }
         }
-        .alert("Something Went Wrong", isPresented: errorBinding) {
+        .alert("Something Went Wrong", isPresented: Binding(presenting: $errorMessage)) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage ?? "")
         }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                session.flushBeforeSuspension()
+                flushInBackground()
             }
         }
     }
 
-    // MARK: Top bar
+    private func close() {
+        flushInBackground()
+        dismiss()
+    }
 
-    private var topBar: some View {
-        HStack(spacing: Theme.Spacing.m) {
-            Button {
-                session.flushBeforeSuspension()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .buttonStyle(.glass)
-            .accessibilityLabel("Library")
-            .accessibilityIdentifier("closeEditor")
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.notebook.title)
-                    .font(.headline)
-                    .foregroundStyle(Theme.primaryText)
-                    .lineLimit(1)
-                Text(statusLine)
-                    .font(.subheadline)
-                    .foregroundStyle(session.saveStatus == .notSaved ? Theme.destructive : Theme.secondaryText)
-                    .contentTransition(.opacity)
-                    .accessibilityIdentifier("saveStatus")
-            }
-
-            Spacer()
-
-            GlassEffectContainer(spacing: Theme.Spacing.s) {
-                HStack(spacing: Theme.Spacing.s) {
-                    Button("Undo", systemImage: "arrow.uturn.backward") {
-                        session.undoManager.undo()
-                    }
-                    Button("Redo", systemImage: "arrow.uturn.forward") {
-                        session.undoManager.redo()
-                    }
-                    Button("Pages", systemImage: "square.grid.2x2") {
-                        isShowingOverview = true
-                    }
-                    moreMenu
-                }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-            }
+    private func flushInBackground() {
+        let autosaver = session.autosaver
+        BackgroundTask.run(named: "Save notebook") {
+            await autosaver.flush()
         }
-        .padding(.horizontal, Theme.Spacing.l)
-        .padding(.top, Theme.Spacing.s)
-    }
-
-    private var statusLine: String {
-        let page = String(localized: "Page \(min(session.currentPageIndex + 1, session.pages.count)) of \(session.pages.count)")
-        return "\(page) · \(statusText)"
-    }
-
-    private var statusText: String {
-        switch session.saveStatus {
-        case .saved: String(localized: "Saved")
-        case .edited: String(localized: "Edited")
-        case .saving: String(localized: "Saving…")
-        case .notSaved: String(localized: "Not Saved")
-        }
-    }
-
-    private var moreMenu: some View {
-        Menu {
-            Button("Rename…", systemImage: "pencil") {
-                titleDraft = session.notebook.title
-                isRenaming = true
-            }
-            paperMenu
-            Toggle("Ruler", systemImage: "ruler", isOn: $palette.isRulerActive)
-            Divider()
-            Button("Export PDF", systemImage: "square.and.arrow.up") {
-                Task { await exportPDF() }
-            }
-        } label: {
-            Label("More", systemImage: "ellipsis")
-        }
-    }
-
-    private var paperMenu: some View {
-        Menu("Paper", systemImage: "doc.plaintext") {
-            if let page = currentPage {
-                Section("This Page") {
-                    ForEach(PaperStyle.allCases, id: \.self) { style in
-                        Button(style.title) {
-                            Task { try? await session.setPaper(Paper(style: style, tone: page.paper.tone), forPage: page.id) }
-                        }
-                    }
-                }
-                Section("Tone for All Pages") {
-                    ForEach(PaperTone.available, id: \.self) { tone in
-                        Button(tone.title) {
-                            Task { try? await session.setPaperForAllPages(Paper(style: page.paper.style, tone: tone)) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var currentPage: Page? {
-        session.pages.indices.contains(session.currentPageIndex) ? session.pages[session.currentPageIndex] : nil
     }
 
     private func exportPDF() async {
         do {
             exportedFile = SharedFile(url: try await session.exportPDF())
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = UserFacingError.message(for: error)
         }
     }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
-    }
-
-    // MARK: Overlays
 
     @ViewBuilder
     private var quickPalette: some View {
@@ -205,6 +115,105 @@ struct NotebookEditorView: View {
             .padding(Theme.Spacing.m)
             .glassEffect(.regular, in: .capsule)
             .padding(.bottom, Theme.Spacing.xl)
+        }
+    }
+}
+
+/// Title, page and save status, and the editor's actions.
+private struct EditorTopBar: View {
+    let session: EditorSession
+    @Bindable var palette: ToolPaletteModel
+    let onClose: () -> Void
+    let onShowOverview: () -> Void
+    let onRename: () -> Void
+    let onExport: () -> Void
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.m) {
+            Button(action: onClose) {
+                Image(systemName: "chevron.left")
+            }
+            .buttonStyle(.glass)
+            .accessibilityLabel("Library")
+            .accessibilityIdentifier("closeEditor")
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.notebook.title)
+                    .font(.headline)
+                    .foregroundStyle(Theme.primaryText)
+                    .lineLimit(1)
+                Text(statusLine)
+                    .font(.subheadline)
+                    .foregroundStyle(session.autosaver.status == .notSaved ? Theme.destructive : Theme.secondaryText)
+                    .contentTransition(.opacity)
+                    .accessibilityIdentifier("saveStatus")
+            }
+
+            Spacer()
+
+            GlassEffectContainer(spacing: Theme.Spacing.s) {
+                HStack(spacing: Theme.Spacing.s) {
+                    Button("Undo", systemImage: "arrow.uturn.backward") { session.undoManager.undo() }
+                    Button("Redo", systemImage: "arrow.uturn.forward") { session.undoManager.redo() }
+                    Button("Pages", systemImage: "square.grid.2x2", action: onShowOverview)
+                    moreMenu
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.glass)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.top, Theme.Spacing.s)
+    }
+
+    private var statusLine: String {
+        let pageNumber = min(session.currentPageIndex + 1, session.pages.count)
+        let page = String(localized: "Page \(pageNumber) of \(session.pages.count)")
+        return "\(page) · \(statusText)"
+    }
+
+    private var statusText: String {
+        switch session.autosaver.status {
+        case .saved: String(localized: "Saved")
+        case .edited: String(localized: "Edited")
+        case .saving: String(localized: "Saving…")
+        case .notSaved: String(localized: "Not Saved")
+        }
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("Rename…", systemImage: "pencil", action: onRename)
+            paperMenu
+            Toggle("Ruler", systemImage: "ruler", isOn: $palette.isRulerActive)
+            Divider()
+            Button("Export PDF", systemImage: "square.and.arrow.up", action: onExport)
+        } label: {
+            Label("More", systemImage: "ellipsis")
+        }
+    }
+
+    @ViewBuilder
+    private var paperMenu: some View {
+        if let page = session.currentPage {
+            Menu("Paper", systemImage: "doc.plaintext") {
+                Section("This Page") {
+                    ForEach(PaperStyle.allCases, id: \.self) { style in
+                        Button(style.title) {
+                            let paper = Paper(style: style, tone: page.paper.tone)
+                            Task { try? await session.setPaper(paper, forPage: page.id) }
+                        }
+                    }
+                }
+                Section("Tone for All Pages") {
+                    ForEach(PaperTone.available, id: \.self) { tone in
+                        Button(tone.title) {
+                            let paper = Paper(style: page.paper.style, tone: tone)
+                            Task { try? await session.setPaperForAllPages(paper) }
+                        }
+                    }
+                }
+            }
         }
     }
 }

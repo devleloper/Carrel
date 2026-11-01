@@ -54,7 +54,7 @@ struct LibrarySidebar: View {
                 Task { await model.createFolder(named: folderName) }
             }
         }
-        .alert("Rename Folder", isPresented: renameBinding) {
+        .alert("Rename Folder", isPresented: Binding(presenting: $renamingFolder)) {
             TextField("Name", text: $folderName)
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
@@ -63,9 +63,5 @@ struct LibrarySidebar: View {
                 }
             }
         }
-    }
-
-    private var renameBinding: Binding<Bool> {
-        Binding(get: { renamingFolder != nil }, set: { if !$0 { renamingFolder = nil } })
     }
 }

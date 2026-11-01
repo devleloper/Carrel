@@ -12,7 +12,12 @@ struct NotebookCoverView: View {
     }
 
     var body: some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 8, topTrailingRadius: 8)
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: 3,
+            bottomLeadingRadius: 3,
+            bottomTrailingRadius: 8,
+            topTrailingRadius: 8
+        )
         ZStack(alignment: .leading) {
             shape.fill(appearance.base)
             shape.fill(materialShading)
@@ -40,11 +45,15 @@ struct NotebookCoverView: View {
         .shadow(color: Theme.pageShadow.opacity(0.22), radius: 6, x: 0, y: 4)
     }
 
+    /// Leather catches more light than cloth or paper, so its sheen is stronger.
     private var materialShading: LinearGradient {
-        let highlight: Double = switch appearance.material {
-        case .leather: 0.16
-        case .cloth, .linen: 0.08
-        case .kraft, .plain: 0.05
+        let highlight = switch appearance.material {
+        case .leather:
+            0.16
+        case .cloth, .linen:
+            0.08
+        case .kraft, .plain:
+            0.05
         }
         return LinearGradient(
             colors: [.white.opacity(highlight), .clear, .black.opacity(highlight)],
@@ -56,7 +65,7 @@ struct NotebookCoverView: View {
     private func label(_ title: String) -> some View {
         Text(title)
             .font(.system(.subheadline, design: .serif, weight: .semibold))
-            .foregroundStyle(Color(uiColor: UIColor(hex: 0x2B241E)))
+            .foregroundStyle(Color(uiColor: Palette.coverLabelText))
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .padding(.horizontal, Theme.Spacing.s)

@@ -18,8 +18,8 @@ final class PageCanvasView: PKCanvasView {
     }
 }
 
-/// One page slot in the editor: paper, a cached image of the ink, and a live canvas while the page is near the
-/// visible area.
+/// One page slot in the editor: paper, a cached image of the ink, and a live canvas while the page is near
+/// the visible area.
 final class PageView: UIView {
     var page: Page? {
         didSet {
@@ -62,12 +62,12 @@ final class PageView: UIView {
         addSubview(unavailableLabel)
 
         outlineLayer.fillColor = nil
-        outlineLayer.strokeColor = UIColor(light: 0x65584B, dark: 0xABA092).cgColor
+        outlineLayer.strokeColor = Palette.secondaryText.cgColor
         outlineLayer.lineDashPattern = [6, 6]
         outlineLayer.lineWidth = 1
         layer.addSublayer(outlineLayer)
 
-        layer.shadowColor = UIColor(hex: 0x3B2A1A).cgColor
+        layer.shadowColor = Palette.pageShadow.cgColor
         layer.shadowOpacity = 0.12
         layer.shadowRadius = 6
         layer.shadowOffset = CGSize(width: 0, height: 2)

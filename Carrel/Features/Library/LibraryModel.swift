@@ -7,7 +7,6 @@ struct NotebookDraft {
     var cover = CoverPreset.forestCloth
     var paper = Paper.standard
     var pageSize = PageSize.a4
-    var folderID: Folder.ID?
 }
 
 /// The library screen's state: notebooks, folders, the selected section and search.
@@ -26,33 +25,53 @@ final class LibraryModel {
     var searchText = ""
     var errorMessage: String?
 
-    @ObservationIgnored let library: LibraryStore
+    private let library: LibraryStore
+    private let snapshots: SnapshotStore
 
-    init(library: LibraryStore) {
+    init(library: LibraryStore, snapshots: SnapshotStore) {
         self.library = library
+        self.snapshots = snapshots
     }
 
     var visibleNotebooks: [Notebook] {
-        let inSection: [Notebook]
-        switch section ?? .all {
-        case .all: inSection = notebooks.filter { !$0.isInTrash }
-        case .favorites: inSection = notebooks.filter { !$0.isInTrash && $0.isFavorite }
-        case .trash: inSection = notebooks.filter(\.isInTrash)
-        case .folder(let folderID): inSection = notebooks.filter { !$0.isInTrash && $0.folderID == folderID }
-        }
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        return inSection
+        return notebooks
+            .filter(isInCurrentSection)
             .filter { query.isEmpty || $0.title.localizedStandardContains(query) }
             .sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
     var sectionTitle: String {
         switch section ?? .all {
-        case .all: String(localized: "Library")
-        case .favorites: String(localized: "Favorites")
-        case .trash: String(localized: "Trash")
-        case .folder(let folderID): folders.first { $0.id == folderID }?.title ?? String(localized: "Folder")
+        case .all:
+            String(localized: "Library")
+        case .favorites:
+            String(localized: "Favorites")
+        case .trash:
+            String(localized: "Trash")
+        case .folder(let folderID):
+            folders.first { $0.id == folderID }?.title ?? String(localized: "Folder")
         }
+    }
+
+    private func isInCurrentSection(_ notebook: Notebook) -> Bool {
+        switch section ?? .all {
+        case .all:
+            !notebook.isInTrash
+        case .favorites:
+            !notebook.isInTrash && notebook.isFavorite
+        case .trash:
+            notebook.isInTrash
+        case .folder(let folderID):
+            !notebook.isInTrash && notebook.folderID == folderID
+        }
+    }
+
+    private var currentFolderID: Folder.ID? {
+        if case .folder(let folderID) = section {
+            return folderID
+        }
+        return nil
     }
 
     func load() async {
@@ -68,34 +87,37 @@ final class LibraryModel {
     // MARK: Notebooks
 
     func create(_ draft: NotebookDraft) async -> Notebook? {
-        let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = Title.normalized(draft.title) ?? String(localized: "Untitled")
+        let folderID = currentFolderID
         return await perform {
             let notebook = try await library.createNotebook(
-                title: title.isEmpty ? String(localized: "Untitled") : title,
+                title: title,
                 cover: Cover(preset: draft.cover),
                 paper: draft.paper,
                 pageSize: draft.pageSize,
-                folderID: draft.folderID ?? currentFolderID
+                folderID: folderID
             )
             await load()
             return notebook
         }
     }
 
+    /// Opens a notebook for editing, after taking a snapshot of it as it was before this session.
     func openSession(for notebook: Notebook) async -> EditorSession? {
         await perform {
             let store = try await library.store(for: notebook.id)
-            try? await library.takeSnapshot(of: notebook.id)
+            try await store.writePendingManifestChanges()
+            // A snapshot is a safety net: failing to take one must not keep the user from their notes.
+            try? snapshots.takeSnapshot(of: notebook.id)
             return await EditorSession.open(store)
         }
     }
 
     func rename(_ notebook: Notebook, to title: String) async {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard let title = Title.normalized(title) else {
             return
         }
-        await update(notebook) { $0.title = trimmed }
+        await update(notebook) { $0.title = title }
     }
 
     func toggleFavorite(_ notebook: Notebook) async {
@@ -132,18 +154,20 @@ final class LibraryModel {
     // MARK: Folders
 
     func createFolder(named title: String) async {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard let title = Title.normalized(title) else {
             return
         }
         await perform {
-            let folder = try await library.createFolder(title: trimmed)
+            let folder = try await library.createFolder(title: title)
             await load()
             section = .folder(folder.id)
         }
     }
 
     func renameFolder(_ folder: Folder, to title: String) async {
+        guard let title = Title.normalized(title) else {
+            return
+        }
         await perform {
             try await library.renameFolder(folder.id, to: title)
             await load()
@@ -160,68 +184,13 @@ final class LibraryModel {
         }
     }
 
-    private var currentFolderID: Folder.ID? {
-        if case .folder(let folderID) = section {
-            return folderID
-        }
-        return nil
-    }
-
-    // MARK: Backup
-
-    func makeBackup() async -> URL? {
-        let fileName = "Carrel Backup \(Date.now.formatted(.iso8601.year().month().day())).aar"
-        let url = FileManager.default.temporaryDirectory.appending(path: fileName)
-        return await perform {
-            try await library.backUp(to: url)
-            UserDefaults.standard.set(Date.now, forKey: Self.lastBackupKey)
-            return url
-        }
-    }
-
-    func restoreBackup(from url: URL) async {
-        let isScoped = url.startAccessingSecurityScopedResource()
-        defer {
-            if isScoped {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-        await perform {
-            try await library.restore(from: url)
-            await load()
-        }
-    }
-
-    var lastBackupDate: Date? {
-        UserDefaults.standard.object(forKey: Self.lastBackupKey) as? Date
-    }
-
-    private static let lastBackupKey = "lastBackupDate"
-
-    // MARK: Errors
-
     @discardableResult
     private func perform<Value>(_ operation: () async throws -> Value) async -> Value? {
         do {
             return try await operation()
         } catch {
-            errorMessage = Self.message(for: error)
+            errorMessage = UserFacingError.message(for: error)
             return nil
-        }
-    }
-
-    private static func message(for error: any Error) -> String {
-        switch error {
-        case LibraryStoreError.insufficientSpace:
-            String(localized: "There isn't enough free space on this iPad. Free up some space and try again.")
-        case LibraryStoreError.backupUnreadable:
-            String(localized: "This file isn't a Carrel backup.")
-        case NotebookStoreError.schemaNewerThanApp:
-            String(localized: "This notebook was saved by a newer version of Carrel. Update the app to open it.")
-        case NotebookStoreError.manifestUnreadable:
-            String(localized: "This notebook couldn't be read. Its files were kept so it can be recovered.")
-        default:
-            error.localizedDescription
         }
     }
 }

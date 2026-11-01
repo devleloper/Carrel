@@ -6,10 +6,12 @@ struct PageOverviewView: View {
     let session: EditorSession
     @Environment(\.dismiss) private var dismiss
 
+    private let columns = [GridItem(.adaptive(minimum: 150), spacing: Theme.Spacing.xl)]
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Theme.Spacing.xl)], spacing: Theme.Spacing.xl) {
+                LazyVGrid(columns: columns, spacing: Theme.Spacing.xl) {
                     ForEach(Array(session.pages.enumerated()), id: \.element.id) { index, page in
                         Button {
                             session.scrollTarget = page.id
@@ -19,7 +21,9 @@ struct PageOverviewView: View {
                                 PageThumbnail(session: session, page: page)
                                 Text("\(index + 1)")
                                     .font(.footnote.monospacedDigit())
-                                    .foregroundStyle(index == session.currentPageIndex ? Theme.accent : Theme.secondaryText)
+                                    .foregroundStyle(
+                                        index == session.currentPageIndex ? Theme.accent : Theme.secondaryText
+                                    )
                             }
                         }
                         .buttonStyle(.plain)
@@ -119,7 +123,8 @@ struct PaperPreview: View {
     var body: some View {
         Canvas { context, canvasSize in
             context.withCGContext { cgContext in
-                PaperRenderer.draw(paper, pageSize: size, in: CGRect(origin: .zero, size: canvasSize), context: cgContext)
+                let bounds = CGRect(origin: .zero, size: canvasSize)
+                PaperRenderer.draw(paper, pageSize: size, in: bounds, context: cgContext)
             }
         }
     }

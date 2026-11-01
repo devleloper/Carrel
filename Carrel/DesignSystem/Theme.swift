@@ -1,17 +1,32 @@
 import SwiftUI
 import UIKit
 
-/// Reading Room tokens. Every color has a light and a dark value; the UI never uses raw hex values directly.
+/// Reading Room colors: the single source for UIKit views and, through `Theme`, for SwiftUI.
+/// Every interface color has a light and a dark value.
+enum Palette {
+    static let desk = UIColor(light: 0xE9E1D3, dark: 0x1B1815)
+    static let surface = UIColor(light: 0xF8F3EA, dark: 0x25211D)
+    static let primaryText = UIColor(light: 0x2B241E, dark: 0xEEE6DA)
+    static let secondaryText = UIColor(light: 0x65584B, dark: 0xABA092)
+    static let accent = UIColor(light: 0x2F6B4F, dark: 0x84BD9D)
+    static let secondaryAccent = UIColor(light: 0x9A6A2C, dark: 0xD8A866)
+    static let separator = UIColor(light: 0xDDD2C2, dark: 0x3A332C)
+    static let destructive = UIColor(light: 0xB3261E, dark: 0xF28B82)
+    static let pageShadow = UIColor(light: 0x3B2A1A, dark: 0x000000)
+    /// Text printed on paper labels of covers. Covers are objects on the desk and do not change in dark mode.
+    static let coverLabelText = UIColor(hex: 0x2B241E)
+}
+
 enum Theme {
-    static let desk = Color(light: 0xE9E1D3, dark: 0x1B1815)
-    static let surface = Color(light: 0xF8F3EA, dark: 0x25211D)
-    static let primaryText = Color(light: 0x2B241E, dark: 0xEEE6DA)
-    static let secondaryText = Color(light: 0x65584B, dark: 0xABA092)
-    static let accent = Color(light: 0x2F6B4F, dark: 0x84BD9D)
-    static let secondaryAccent = Color(light: 0x9A6A2C, dark: 0xD8A866)
-    static let separator = Color(light: 0xDDD2C2, dark: 0x3A332C)
-    static let destructive = Color(light: 0xB3261E, dark: 0xF28B82)
-    static let pageShadow = Color(light: 0x3B2A1A, dark: 0x000000)
+    static let desk = Color(uiColor: Palette.desk)
+    static let surface = Color(uiColor: Palette.surface)
+    static let primaryText = Color(uiColor: Palette.primaryText)
+    static let secondaryText = Color(uiColor: Palette.secondaryText)
+    static let accent = Color(uiColor: Palette.accent)
+    static let secondaryAccent = Color(uiColor: Palette.secondaryAccent)
+    static let separator = Color(uiColor: Palette.separator)
+    static let destructive = Color(uiColor: Palette.destructive)
+    static let pageShadow = Color(uiColor: Palette.pageShadow)
 
     enum Spacing {
         static let xs: CGFloat = 4
@@ -36,12 +51,6 @@ extension Font {
     }
 }
 
-extension Color {
-    init(light: UInt32, dark: UInt32) {
-        self.init(uiColor: UIColor(light: light, dark: dark))
-    }
-}
-
 extension UIColor {
     nonisolated convenience init(light: UInt32, dark: UInt32) {
         self.init { traits in
@@ -56,5 +65,16 @@ extension UIColor {
             blue: CGFloat(hex & 0xFF) / 255,
             alpha: alpha
         )
+    }
+
+    /// The color as 0xRRGGBB, used to store ink colors the user picks.
+    var hexValue: UInt32 {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let channel = { (value: CGFloat) in UInt32((min(max(value, 0), 1) * 255).rounded()) }
+        return channel(red) << 16 | channel(green) << 8 | channel(blue)
     }
 }

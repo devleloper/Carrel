@@ -11,6 +11,8 @@ struct LibraryView: View {
     @State private var renamingNotebook: Notebook?
     @State private var titleDraft = ""
 
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: Theme.Spacing.xxl)]
+
     var body: some View {
         NavigationSplitView {
             LibrarySidebar(model: model, isShowingSettings: $isShowingSettings)
@@ -19,16 +21,7 @@ struct LibraryView: View {
                 notebookGrid
                     .navigationTitle(model.sectionTitle)
                     .searchable(text: $model.searchText, prompt: "Search Notebooks")
-                    .toolbar {
-                        if model.section != .trash {
-                            ToolbarItem(placement: .primaryAction) {
-                                Button("New Notebook", systemImage: "plus") {
-                                    isCreatingNotebook = true
-                                }
-                                .accessibilityIdentifier("newNotebook")
-                            }
-                        }
-                    }
+                    .toolbar { newNotebookButton }
             }
         }
         .tint(Theme.accent)
@@ -40,9 +33,9 @@ struct LibraryView: View {
                 .navigationTransition(.zoom(sourceID: session.id, in: coverNamespace))
         }
         .sheet(isPresented: $isShowingSettings) {
-            SettingsView(model: model)
+            SettingsView()
         }
-        .alert("Rename Notebook", isPresented: renameBinding) {
+        .alert("Rename Notebook", isPresented: Binding(presenting: $renamingNotebook)) {
             TextField("Title", text: $titleDraft)
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
@@ -51,7 +44,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .alert("Something Went Wrong", isPresented: errorBinding) {
+        .alert("Something Went Wrong", isPresented: Binding(presenting: $model.errorMessage)) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")
@@ -59,9 +52,21 @@ struct LibraryView: View {
         .task { await model.purgeExpiredTrashAndLoad() }
     }
 
+    @ToolbarContentBuilder
+    private var newNotebookButton: some ToolbarContent {
+        if model.section != .trash {
+            ToolbarItem(placement: .primaryAction) {
+                Button("New Notebook", systemImage: "plus") {
+                    isCreatingNotebook = true
+                }
+                .accessibilityIdentifier("newNotebook")
+            }
+        }
+    }
+
     private var notebookGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 210), spacing: Theme.Spacing.xxl)], spacing: Theme.Spacing.xxl) {
+            LazyVGrid(columns: columns, spacing: Theme.Spacing.xxl) {
                 ForEach(model.visibleNotebooks) { notebook in
                     notebookCard(notebook)
                 }
@@ -115,8 +120,14 @@ struct LibraryView: View {
                 titleDraft = notebook.title
                 renamingNotebook = notebook
             }
-            Button(notebook.isFavorite ? "Remove from Favorites" : "Add to Favorites", systemImage: notebook.isFavorite ? "star.slash" : "star") {
-                Task { await model.toggleFavorite(notebook) }
+            if notebook.isFavorite {
+                Button("Remove from Favorites", systemImage: "star.slash") {
+                    Task { await model.toggleFavorite(notebook) }
+                }
+            } else {
+                Button("Add to Favorites", systemImage: "star") {
+                    Task { await model.toggleFavorite(notebook) }
+                }
             }
             Menu("Move to Folder", systemImage: "folder") {
                 Button("No Folder") {
@@ -139,9 +150,17 @@ struct LibraryView: View {
     private var emptyState: some View {
         switch model.section ?? .all {
         case .trash:
-            ContentUnavailableView("Trash Is Empty", systemImage: "trash", description: Text("Deleted notebooks stay here for 30 days."))
+            ContentUnavailableView(
+                "Trash Is Empty",
+                systemImage: "trash",
+                description: Text("Deleted notebooks stay here for 30 days.")
+            )
         case .favorites:
-            ContentUnavailableView("No Favorites", systemImage: "star", description: Text("Touch and hold a notebook, then choose Add to Favorites."))
+            ContentUnavailableView(
+                "No Favorites",
+                systemImage: "star",
+                description: Text("Touch and hold a notebook, then choose Add to Favorites.")
+            )
         default:
             if model.searchText.isEmpty {
                 ContentUnavailableView {
@@ -173,13 +192,5 @@ struct LibraryView: View {
                 await open(notebook)
             }
         }
-    }
-
-    private var renameBinding: Binding<Bool> {
-        Binding(get: { renamingNotebook != nil }, set: { if !$0 { renamingNotebook = nil } })
-    }
-
-    private var errorBinding: Binding<Bool> {
-        Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
     }
 }

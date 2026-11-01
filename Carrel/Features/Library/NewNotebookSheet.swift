@@ -7,6 +7,8 @@ struct NewNotebookSheet: View {
     @State private var draft = NotebookDraft()
     @Environment(\.dismiss) private var dismiss
 
+    private let coverColumns = Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.m), count: 6)
+
     var body: some View {
         NavigationStack {
             Form {
@@ -16,7 +18,7 @@ struct NewNotebookSheet: View {
                         .accessibilityIdentifier("notebookTitle")
                 }
                 Section("Cover") {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.m), count: 6), spacing: Theme.Spacing.m) {
+                    LazyVGrid(columns: coverColumns, spacing: Theme.Spacing.m) {
                         ForEach(CoverPreset.allCases, id: \.self) { preset in
                             coverButton(preset)
                         }

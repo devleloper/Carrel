@@ -9,11 +9,12 @@ struct CarrelApp: App {
             switch dependencies {
             case .success(let dependencies):
                 LibraryView(model: dependencies.library)
+                    .environment(dependencies.backup)
             case .failure(let error):
                 ContentUnavailableView {
                     Label("Carrel Can't Open Your Library", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text(error.localizedDescription)
+                    Text(UserFacingError.message(for: error))
                 }
             }
         }
