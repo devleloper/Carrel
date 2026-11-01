@@ -1,8 +1,10 @@
-# Notebook
+# Carrel
+
+[![CI](https://github.com/devleloper/notebook/actions/workflows/ci.yml/badge.svg)](https://github.com/devleloper/notebook/actions/workflows/ci.yml)
 
 A native iPadOS notebook for handwritten notes: a quiet, cozy place to write with Apple Pencil, built for lectures and study first.
 
-> **Status:** product discovery. No app code yet: the product proposal is under review, and implementation starts once it is approved.
+> **Status:** MVP in development (0.1.0). Carrel is the working name.
 
 ## Principles
 
@@ -18,8 +20,14 @@ A native iPadOS notebook for handwritten notes: a quiet, cozy place to write wit
 - Swift 6, SwiftUI, PencilKit
 - No third-party runtime dependencies
 
+## Building
+
+Open `Carrel.xcodeproj` in Xcode 27 and run the `Carrel` scheme. There are no third-party dependencies.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers signing for a device, tests and conventions.
+
 ## Documentation
 
+- [Architecture](ARCHITECTURE.md): layers, modules, files on disk, saving and recovery.
 - [Product proposal](docs/proposal/README.md) (in Russian): concept, features and priorities, UI/UX, architecture, roadmap and risks.
 
 ## License
