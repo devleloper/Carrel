@@ -90,7 +90,8 @@ struct LibraryStoreTests {
         let package = NotebookPackage(url: library.layout.packageURL(for: notebook.id))
         try Data("{ damaged".utf8).write(to: package.manifestURL)
 
-        let contents = await LibraryStore(layout: library.layout, supportedContentVersion: 5).contents()
+        let reopened = try LibraryStore(layout: library.layout, supportedContentVersion: 5)
+        let contents = await reopened.contents()
 
         #expect(contents.notebooks.isEmpty)
         #expect(contents.unreadable == [UnreadableNotebook(id: notebook.id, reason: .manifestUnreadable)])
