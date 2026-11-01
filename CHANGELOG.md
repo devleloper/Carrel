@@ -8,11 +8,13 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Library with folders, favorites, search by title and a Trash that keeps notebooks and pages for 30 days.
-- New notebook sheet with 12 covers, five paper styles in White and Cream, A4 and Letter.
+- New notebook sheet with 12 covers, six paper styles in White and Cream, A4, Letter and A4 Landscape.
 - Editor with a vertical stream of pages, pinch to zoom, and a next page that appears with the first stroke.
 - Palette with three favorite pens, highlighter, eraser and lasso; tap a selected tool again for its settings.
 - Apple Pencil Pro squeeze and double tap open a compact palette at the pen tip.
 - Autosave: at most five seconds of writing at risk if the app crashes, nothing when it goes to the background.
 - Recovery of damaged or missing pages from the previous version, with the damaged file kept aside.
+- The editor closes only once everything is saved, and shows why when a save fails.
+- Notebooks that can't be opened are reported in the library; their files are left untouched.
 - Page overview with duplicate, reorder, delete and restore.
 - PDF export and a one-file library backup that can be restored from Settings.

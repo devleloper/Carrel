@@ -40,26 +40,31 @@ Apple frameworks. The app target uses `MainActor` default isolation; the package
 - Prefer concrete types. Introduce a protocol only for a real second implementation or a test seam that matters.
 - Comments explain *why*: a platform constraint, a non-obvious decision, an invariant. Never restate the code.
 - No `TODO` or `FIXME` in the code: open an issue instead. `Scripts/lint.sh` enforces this.
-- `NotebookData` never traps (`fatalError`, `try!`): damaged files must be recoverable. Also enforced by lint.
+- `CarrelKit` never traps (`fatalError`, `precondition`, `try!`): damaged files must be recoverable. Also
+  enforced by lint.
 - New logic comes with Swift Testing tests: in the package when it does not need UIKit, otherwise in
   `CarrelTests`. A new user flow gets a UI test in `CarrelUITests`.
 - Follow the design rules in [ARCHITECTURE.md](ARCHITECTURE.md#design-rules): one reason to change per type,
   abstractions only where they pay for themselves, no duplicated knowledge.
-- Every user-facing string goes through the String Catalog (`Text("…")`, `String(localized:)`).
+- Every user-facing string is localizable: `Text("…")`, `String(localized:)` or `LocalizedStringResource`.
+  Xcode extracts them into `Carrel/Resources/Localizable.xcstrings` when it builds; English is the only
+  language so far.
+- Errors from anything that writes reach the user through the screen's `errorMessage` and `errorAlert`.
 
 ## Commits and branches
 
 - Commits go straight to `main`, which must stay green. Keep each commit small and self-contained.
 - Messages follow [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(editor): open the palette at the pen tip on squeeze`.
-  Types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`.
-  Scopes: `editor`, `library`, `storage`, `settings`, `design`, `ci`, `docs`.
+  Types: `feat`, `fix`, `perf`, `refactor`, `style`, `test`, `docs`, `build`, `ci`, `chore`.
+  Scopes: `app` (changes across the app target), `editor`, `library`, `settings`, `design`, `storage` (the
+  package), `proposal` (the design documents in `docs/proposal`).
 - Occasional branches use `spike/<topic>`, `release/<version>` or `hotfix/<topic>`.
 - User-visible changes are added to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) in the same commit.
 
 ## Definition of done
 
-- Lint, package tests and UI tests pass.
+- Lint, package tests, unit tests and UI tests pass, without compiler warnings: CI treats them as errors.
 - Nothing can lose writing: think through a crash at every await between a change and the disk.
 - VoiceOver labels exist for new controls; Dynamic Type and Reduce Motion are respected.
 - Editor changes are checked on a real iPad with Apple Pencil.

@@ -9,7 +9,7 @@ A native iPadOS notebook for handwritten notes: a quiet, cozy place to write wit
 ## Principles
 
 - **The page comes first.** Writing tools stay out of the way; nothing sits on the paper while you write.
-- **Your notes are safe.** Every page is saved crash-safely on the device, with snapshots and backups you can restore.
+- **Your notes are safe.** Every page is saved crash-safely on the device, snapshots are taken automatically, and a one-file backup restores the whole library.
 - **Fast at any size.** A notebook with hundreds of pages or a 1000-page PDF opens and scrolls without waiting.
 - **The basics are never behind a subscription.** Writing, organizing and getting your notes out of the app are not paywalled.
 - **AI is optional.** The app is complete without it, and nothing leaves the device unless you turn it on.
