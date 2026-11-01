@@ -5,6 +5,7 @@ import Testing
 @testable import NotebookData
 
 @MainActor
+@Suite(.timeLimit(.minutes(1)))
 struct InkAutosaverTests {
     /// Ink the autosaver reads at write time, standing in for the editor's live drawings.
     final class InkSource {

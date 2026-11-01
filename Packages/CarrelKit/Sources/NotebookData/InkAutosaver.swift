@@ -83,12 +83,13 @@ public final class InkAutosaver {
             refreshStatus()
             return
         }
-        let write = Task { await writeDirtyPages() }
-        inFlightSave = write
-        await write.value
-        if inFlightSave == write {
+        // The write clears itself before it finishes. Every waiter therefore sees `nil` when it resumes, instead of
+        // spinning on a finished task that its owner has not cleared yet.
+        inFlightSave = Task {
+            await writeDirtyPages()
             inFlightSave = nil
         }
+        await inFlightSave?.value
     }
 
     private func writeDirtyPages() async {
