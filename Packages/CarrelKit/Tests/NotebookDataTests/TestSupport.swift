@@ -47,7 +47,6 @@ struct NotebookFixture {
         )
     }
 
-
     func reopen() throws -> NotebookStore {
         try NotebookStore.open(
             at: store.package.url,
