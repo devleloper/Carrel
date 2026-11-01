@@ -19,6 +19,11 @@ if [[ -z "$destination_id" ]]; then
   exit 1
 fi
 
+# The UI test runner gives up when its own setup waits too long. On a busy CI machine that setup overlapped with
+# the simulator still booting and with xcodebuild cloning it for the unit tests. So the device is booted before the
+# tests start, and the test targets run one after another on it instead of on a clone in parallel.
+xcrun simctl bootstatus "$destination_id" -b
+
 rm -rf build/Carrel.xcresult
 mkdir -p build
 set +e
@@ -26,6 +31,7 @@ xcodebuild test \
   -project Carrel.xcodeproj \
   -scheme Carrel \
   -destination "id=$destination_id" \
+  -parallel-testing-enabled NO \
   -resultBundlePath build/Carrel.xcresult \
   SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
   CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/xcodebuild.log

@@ -33,6 +33,7 @@ final class LibraryFlowTests: XCTestCase {
         let closeButton = app.buttons["closeEditor"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 10), "Creating a notebook should open it")
         XCTAssertTrue(app.staticTexts["saveStatus"].exists)
+        try app.performAccessibilityAudit(for: Self.audits)
         closeButton.tap()
 
         XCTAssertTrue(app.buttons["Linear Algebra"].waitForExistence(timeout: 5))
