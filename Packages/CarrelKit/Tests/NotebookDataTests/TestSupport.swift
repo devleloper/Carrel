@@ -20,6 +20,7 @@ struct NotebookFixture {
     static let supportedContentVersion = 5
 
     let directory: URL
+    let recoveredDirectory: URL
     let store: NotebookStore
     let pageID: Page.ID
 
@@ -36,6 +37,7 @@ struct NotebookFixture {
         )
         let page = Page(sortKey: .initial, size: .a4, paper: .standard, now: now)
         pageID = page.id
+        recoveredDirectory = directory.appending(path: "Recovered", directoryHint: .isDirectory)
         store = try NotebookStore.create(
             notebook,
             firstPage: page,
@@ -45,9 +47,6 @@ struct NotebookFixture {
         )
     }
 
-    var recoveredDirectory: URL {
-        directory.appending(path: "Recovered", directoryHint: .isDirectory)
-    }
 
     func reopen() throws -> NotebookStore {
         try NotebookStore.open(
