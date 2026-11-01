@@ -21,11 +21,12 @@ There are no third-party dependencies, so the project builds right after cloning
 
 | What | Command |
 |---|---|
-| Lint and hygiene checks | `Scripts/lint.sh` |
+| Lint and hygiene checks (any swift-format finding fails) | `Scripts/lint.sh` |
 | Domain and storage tests (seconds, no simulator) | `swift test --package-path Packages/CarrelKit` |
-| App build and UI tests on an iPad simulator | `Scripts/test.sh` |
+| App build, unit tests and UI tests on an iPad simulator | `Scripts/test.sh` |
 
-CI runs the same three commands on every push to `main`.
+CI runs the same three commands on every push to `main`. Run `xcrun swift-format format --in-place --recursive
+Carrel CarrelTests CarrelUITests Packages/CarrelKit` before committing to fix formatting automatically.
 
 ## Where things live
 
@@ -40,7 +41,10 @@ Apple frameworks. The app target uses `MainActor` default isolation; the package
 - Comments explain *why*: a platform constraint, a non-obvious decision, an invariant. Never restate the code.
 - No `TODO` or `FIXME` in the code: open an issue instead. `Scripts/lint.sh` enforces this.
 - `NotebookData` never traps (`fatalError`, `try!`): damaged files must be recoverable. Also enforced by lint.
-- New logic in the package comes with Swift Testing tests. A new user flow gets a UI test.
+- New logic comes with Swift Testing tests: in the package when it does not need UIKit, otherwise in
+  `CarrelTests`. A new user flow gets a UI test in `CarrelUITests`.
+- Follow the design rules in [ARCHITECTURE.md](ARCHITECTURE.md#design-rules): one reason to change per type,
+  abstractions only where they pay for themselves, no duplicated knowledge.
 - Every user-facing string goes through the String Catalog (`Text("…")`, `String(localized:)`).
 
 ## Commits and branches

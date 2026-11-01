@@ -21,14 +21,32 @@ plus the PencilKit content version needed to read them. Both run their tests on 
 
 | Where | What |
 |---|---|
-| `Packages/CarrelKit/Sources/NotebookDomain` | `Notebook`, `Page`, `Folder`, `Paper`, `Cover`, `SortKey`, `AutosavePolicy` |
-| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore`, `NotebookStore`, `InkEnvelope`, `LibraryArchive`, safe file writes |
+| `Packages/CarrelKit/Sources/NotebookDomain` | `Notebook`, `Page`, `Folder`, `Paper`, `Cover`, `SortKey`, `Title`, `AutosavePolicy` |
+| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore` (catalog and folders), `NotebookStore` (one notebook), `InkAutosaver`, `SnapshotStore`, `LibraryBackup`, `InkEnvelope`, `VersionedFile` |
 | `Carrel/App` | `CarrelApp`, `AppDependencies` (the composition root) |
-| `Carrel/Features/Library` | Library, folders, trash, new notebook sheet |
-| `Carrel/Features/Editor` | `EditorSession`, the UIKit canvas controller, palettes, page overview |
-| `Carrel/Features/Settings` | Backup, restore, about |
-| `Carrel/Services` | `InkCodec`, `PaperRenderer`, `PDFExporter` |
-| `Carrel/DesignSystem` | Reading Room colors, type, spacing, motion, ink palette, covers |
+| `Carrel/Features/Library` | `LibraryModel`, library screens, new notebook sheet |
+| `Carrel/Features/Editor` | `EditorSession`, `DrawingCache`, `NotebookCanvasViewController`, `PageStackLayout`, `PencilInteractionHandler`, palettes, page overview |
+| `Carrel/Features/Settings` | `BackupModel`, settings screen |
+| `Carrel/Features/Shared` | `UserFacingError`, presentation bindings, the share sheet |
+| `Carrel/Services` | `InkCodec`, `InkRenderer`, `PaperRenderer`, `PDFExporter`, `BackgroundTask` |
+| `Carrel/DesignSystem` | Reading Room `Palette` and `Theme`, ink palette, covers |
+
+## Design rules
+
+- **One reason to change per type.** Storage is split by what it owns: `LibraryStore` the catalog,
+  `NotebookStore` one package, `InkAutosaver` when ink is written, `SnapshotStore` and `LibraryBackup` the
+  safety nets. In the editor, `EditorSession` owns page structure, `DrawingCache` the live drawings,
+  `PageStackLayout` the geometry and `PencilInteractionHandler` the Apple Pencil gestures.
+- **Abstractions where they pay for themselves.** Views and models depend on the concrete stores: there is one
+  implementation, and tests run them against temporary directories, which exercises the real file handling
+  instead of a mock. Volatile inputs are injected instead: time (`now:` parameters), `UserDefaults`, the
+  autosave policy and the library location. A protocol is introduced together with a second implementation,
+  not before.
+- **Logic lives where it can be tested quickly.** Anything that does not need UIKit lives in the package and
+  runs with `swift test` on the Mac; app-side logic is pure where possible (`PageStackLayout`) and is covered by
+  the `CarrelTests` target.
+- **No duplicated knowledge.** Colors come from `Palette`, file generations from `VersionedFile`, title rules
+  from `Title`, error wording from `UserFacingError`.
 
 ## Data on disk
 
@@ -51,9 +69,10 @@ Application Support/Carrel/
 
 ## Saving
 
-`EditorSession` keeps the latest drawing of every edited page and writes it after 2 s of rest, at most 5 s after
-the first unsaved change, and immediately when the scene becomes inactive. If the app crashes, at most 5 s of
-continuous writing is lost. Saves run one at a time, so an older drawing can never overwrite a newer one.
+`DrawingCache` keeps the latest drawing of every edited page. `InkAutosaver` encodes and writes it after 2 s of
+rest, at most 5 s after the first unsaved change, and immediately when the scene becomes inactive. If the app
+crashes, at most 5 s of continuous writing is lost. Saves run one at a time, so an older drawing can never
+overwrite a newer one; the package tests cover this ordering.
 
 ## Writing surface
 
