@@ -4,7 +4,7 @@ import UIKit
 /// Ink colors chosen to stay distinguishable on every paper tone and for common color-vision deficiencies.
 /// Ink is content: these values are stored in drawings and look the same in light and dark mode.
 enum InkPalette {
-    struct Swatch: Identifiable, Hashable {
+    struct Swatch: Identifiable {
         let name: LocalizedStringResource
         let hex: UInt32
 
