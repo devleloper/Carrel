@@ -1,0 +1,5 @@
+PRODUCT_NAME = CarrelUITests
+PRODUCT_BUNDLE_IDENTIFIER = dev.devlet.notebook.uitests
+GENERATE_INFOPLIST_FILE = YES
+TEST_TARGET_NAME = Carrel
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @loader_path/Frameworks

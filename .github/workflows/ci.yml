@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, package tests, app build and UI tests
+    # GitHub's image with Xcode 27 and iPadOS 27 simulators (public preview as of October 2026).
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Lint
+        run: Scripts/lint.sh
+
+      - name: Package tests
+        run: swift test --package-path Packages/CarrelKit
+
+      - name: Build and UI tests
+        run: Scripts/test.sh
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Carrel.xcresult
+          path: build/Carrel.xcresult
+          retention-days: 7

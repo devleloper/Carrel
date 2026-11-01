@@ -39,3 +39,6 @@ fastlane/test_output/
 .env
 .env.*
 Secrets.xcconfig
+
+# Personal signing settings (DEVELOPMENT_TEAM)
+Config/Local.xcconfig

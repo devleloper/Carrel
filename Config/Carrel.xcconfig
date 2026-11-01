@@ -1,0 +1,18 @@
+// The app target. Identifiers never change, even if the product is renamed (proposal, section 9).
+
+PRODUCT_NAME = Carrel
+PRODUCT_BUNDLE_IDENTIFIER = dev.devlet.notebook$(BUNDLE_ID_SUFFIX)
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE = Config/Carrel-Info.plist
+INFOPLIST_KEY_CFBundleDisplayName = Carrel
+INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.productivity
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES
+INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+
+SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+SWIFT_APPROACHABLE_CONCURRENCY = YES
+ENABLE_PREVIEWS = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks

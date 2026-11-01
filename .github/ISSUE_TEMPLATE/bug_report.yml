@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a notebook
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: data-loss
+    attributes:
+      label: Was any writing lost?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: iPad, iPadOS version, Apple Pencil, app version
+      placeholder: iPad Air (M3), iPadOS 27.1, Apple Pencil Pro, 0.1.0 (1)
+    validations:
+      required: true
