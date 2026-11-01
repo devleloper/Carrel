@@ -17,7 +17,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Lint
         run: Scripts/lint.sh
 
@@ -26,7 +26,7 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Toolchain
         run: |
@@ -34,7 +34,9 @@ jobs:
           swift --version
 
       - name: Package tests
-        run: swift test --package-path Packages/CarrelKit
+        run: |
+          swift build --build-tests --package-path Packages/CarrelKit -Xswiftc -warnings-as-errors
+          swift test --skip-build --package-path Packages/CarrelKit
 
       - name: Build and test the app
         run: Scripts/test.sh

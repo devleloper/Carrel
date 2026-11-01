@@ -27,11 +27,12 @@ xcodebuild test \
   -scheme Carrel \
   -destination "id=$destination_id" \
   -resultBundlePath build/Carrel.xcresult \
+  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
   CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/xcodebuild.log
 status=${PIPESTATUS[0]}
 set -e
 
-# Compiler warnings scroll by in thousands of lines of output; repeat them at the end where they are seen.
-echo "Compiler warnings in project sources:"
-grep -E "^$PWD/.*\.swift:[0-9]+:[0-9]+: warning:" build/xcodebuild.log | sed "s#^$PWD/##" | sort -u || echo "none"
+# Compiler diagnostics scroll by in thousands of lines of output; repeat them at the end where they are seen.
+echo "Compiler errors and warnings in project sources:"
+grep -E "^$PWD/.*\.swift:[0-9]+:[0-9]+: (error|warning):" build/xcodebuild.log | sed "s#^$PWD/##" | sort -u || echo "none"
 exit "$status"

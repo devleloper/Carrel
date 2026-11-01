@@ -7,6 +7,9 @@ sources=(Carrel CarrelTests CarrelUITests Packages/CarrelKit)
 
 if xcrun --find swift-format >/dev/null 2>&1; then
   xcrun swift-format lint --strict --recursive --configuration .swift-format "${sources[@]}"
+elif [[ -n "${CI:-}" ]]; then
+  echo "swift-format is missing from the CI toolchain, so formatting cannot be checked." >&2
+  exit 1
 else
   echo "swift-format is not available in this toolchain; skipping formatting checks." >&2
 fi
@@ -16,9 +19,9 @@ if grep -rn --include='*.swift' -E '\b(TODO|FIXME)\b' "${sources[@]}"; then
   echo "Resolve TODO/FIXME comments or turn them into issues." >&2
   status=1
 fi
-# The data layer must never crash on bad input: damaged files are recovered, not trapped on.
-if grep -rn --include='*.swift' -E 'fatalError|preconditionFailure|try!' Packages/CarrelKit/Sources/NotebookData; then
-  echo "NotebookData must not trap. Throw an error the caller can recover from." >&2
+# The package reads files from disk and must never crash on bad input: damaged files are recovered, not trapped on.
+if grep -rn --include='*.swift' -E 'fatalError|precondition(Failure)?\(|try!' Packages/CarrelKit/Sources; then
+  echo "CarrelKit must not trap. Throw an error the caller can recover from." >&2
   status=1
 fi
 exit $status

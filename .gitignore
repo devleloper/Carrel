@@ -24,12 +24,6 @@ playground.xcworkspace
 .build/
 .swiftpm/
 
-# Fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output/
-
 # Signing material and secrets never belong in the repository
 *.p8
 *.p12
@@ -38,7 +32,6 @@ fastlane/test_output/
 *.provisionprofile
 .env
 .env.*
-Secrets.xcconfig
 
 # Personal signing settings (DEVELOPMENT_TEAM)
 Config/Local.xcconfig
