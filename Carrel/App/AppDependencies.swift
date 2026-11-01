@@ -3,27 +3,40 @@ import NotebookData
 
 /// The composition root: builds the object graph once and hands it to the views.
 final class AppDependencies {
-    let library: LibraryModel
-    let backup: BackupModel
+    let libraryModel: LibraryModel
+    let backupModel: BackupModel
+    let toolPalette: ToolPaletteModel
 
-    init(arguments: [String] = ProcessInfo.processInfo.arguments, defaults: UserDefaults = .standard) throws {
-        let layout = LibraryLayout(root: Self.libraryRoot(arguments: arguments))
+    init(arguments: [String] = ProcessInfo.processInfo.arguments) throws {
+        let isUITesting = arguments.contains("-ui-testing")
+        let layout = LibraryLayout(root: isUITesting ? Self.uiTestingLibraryRoot() : Self.libraryRoot)
+        let defaults = isUITesting ? Self.uiTestingDefaults() : .standard
         let store = try LibraryStore(layout: layout, supportedContentVersion: InkCodec.supportedContentVersion)
-        let library = LibraryModel(library: store, snapshots: SnapshotStore(layout: layout))
-        self.library = library
-        self.backup = BackupModel(backup: LibraryBackup(library: store), defaults: defaults) {
-            await library.load()
+        let libraryModel = LibraryModel(store: store, snapshots: SnapshotStore(layout: layout))
+        self.libraryModel = libraryModel
+        self.backupModel = BackupModel(backup: LibraryBackup(store: store), defaults: defaults) {
+            await libraryModel.load()
         }
+        self.toolPalette = ToolPaletteModel(defaults: defaults)
     }
 
-    /// UI tests start from an empty library that never touches the user's notebooks.
-    private static func libraryRoot(arguments: [String]) -> URL {
-        if arguments.contains("-ui-testing") {
-            return FileManager.default.temporaryDirectory.appending(
-                path: "UITests-\(UUID().uuidString)",
-                directoryHint: .isDirectory
-            )
-        }
-        return URL.applicationSupportDirectory.appending(path: "Carrel", directoryHint: .isDirectory)
+    private static let libraryRoot = URL.applicationSupportDirectory.appending(
+        path: "Carrel",
+        directoryHint: .isDirectory
+    )
+
+    // UI tests start from an empty library and default settings, and never touch the user's notebooks.
+
+    private static func uiTestingLibraryRoot() -> URL {
+        FileManager.default.temporaryDirectory.appending(
+            path: "UITests-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+    }
+
+    private static func uiTestingDefaults() -> UserDefaults {
+        let suiteName = "UITests"
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        return UserDefaults(suiteName: suiteName) ?? .standard
     }
 }

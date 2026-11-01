@@ -24,8 +24,8 @@ final class BackupModel {
 
     /// Writes a backup to a temporary file and returns it, ready to be shared or saved to Files.
     func makeBackup(now: Date = .now) async -> URL? {
-        let fileName = "Carrel Backup \(now.formatted(.iso8601.year().month().day())).aar"
-        let url = FileManager.default.temporaryDirectory.appending(path: fileName)
+        let name = String(localized: "Carrel Backup \(now.formatted(.iso8601.year().month().day()))")
+        let url = FileManager.default.temporaryDirectory.appending(path: name).appendingPathExtension("aar")
         isWorking = true
         defer { isWorking = false }
         do {

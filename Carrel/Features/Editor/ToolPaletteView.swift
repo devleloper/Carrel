@@ -57,16 +57,19 @@ struct QuickPaletteView: View {
                 }
             }
             if case .pen(let index) = palette.selection {
-                recentColors(forPen: index)
+                quickColors(forPen: index)
             }
         }
         .padding(Theme.Spacing.m)
         .glassEffect(.regular, in: .rect(cornerRadius: 24))
     }
 
-    private func recentColors(forPen index: Int) -> some View {
+    /// The first pen colors, one tap away while writing; all of them are in the pen's settings.
+    private static let quickColorCount = 6
+
+    private func quickColors(forPen index: Int) -> some View {
         HStack(spacing: Theme.Spacing.s) {
-            ForEach(InkPalette.pens.prefix(6)) { swatch in
+            ForEach(InkPalette.pens.prefix(Self.quickColorCount)) { swatch in
                 Button {
                     palette.settings.pens[index].colorHex = swatch.hex
                     onDone()
@@ -76,7 +79,7 @@ struct QuickPaletteView: View {
                         .frame(width: 26, height: 26)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(swatch.name)
+                .accessibilityLabel(Text(swatch.name))
             }
         }
     }
@@ -108,7 +111,7 @@ private struct ToolButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .accessibilityLabel(Text(tool.title))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -126,15 +129,6 @@ private struct ToolButton: View {
             Image(systemName: "eraser")
         case .lasso:
             Image(systemName: "lasso")
-        }
-    }
-
-    private var label: Text {
-        switch tool {
-        case .pen(let index): Text("Pen \(index + 1)")
-        case .highlighter: Text("Highlighter")
-        case .eraser: Text("Eraser")
-        case .lasso: Text("Lasso")
         }
     }
 
@@ -156,11 +150,11 @@ struct ToolSettingsView: View {
                     penSettings(index)
                 }
             case .highlighter:
-                Text("Highlighter").font(.headline)
+                Text(tool.title).font(.headline)
                 swatchGrid(InkPalette.highlighters, selection: $palette.settings.highlighterHex)
                 widthSlider($palette.settings.highlighterWidth, range: 10...40)
             case .eraser:
-                Text("Eraser").font(.headline)
+                Text(tool.title).font(.headline)
                 Picker("Mode", selection: $palette.settings.isPreciseEraser) {
                     Text("Whole Stroke").tag(false)
                     Text("Precise").tag(true)
@@ -179,7 +173,7 @@ struct ToolSettingsView: View {
 
     @ViewBuilder
     private func penSettings(_ index: Int) -> some View {
-        Text("Pen \(index + 1)").font(.headline)
+        Text(tool.title).font(.headline)
         Picker("Ink", selection: $palette.settings.pens[index].inkType) {
             ForEach(PenSettings.InkType.allCases, id: \.self) { type in
                 Text(type.title).tag(type)
@@ -211,7 +205,7 @@ struct ToolSettingsView: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(swatch.name)
+                .accessibilityLabel(Text(swatch.name))
             }
         }
     }

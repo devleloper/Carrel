@@ -7,24 +7,24 @@ public enum LibraryBackupError: Error, Equatable {
 
 /// Backs up the whole library into one Apple Archive file and restores it.
 public struct LibraryBackup: Sendable {
-    private let library: LibraryStore
+    private let store: LibraryStore
 
-    public init(library: LibraryStore) {
-        self.library = library
+    public init(store: LibraryStore) {
+        self.store = store
     }
 
     private var layout: LibraryLayout {
-        library.layout
+        store.layout
     }
 
     public func write(to destination: URL) async throws {
-        try await library.writePendingChanges()
-        let required = FileManager.default.allocatedSize(ofDirectory: layout.library)
+        try await store.writePendingChanges()
+        let required = FileManager.default.allocatedSize(ofDirectory: layout.libraryDirectory)
         let values = try? layout.root.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         guard (values?.volumeAvailableCapacityForImportantUsage ?? .max) > required else {
             throw LibraryBackupError.insufficientSpace
         }
-        try LibraryArchive.write(directory: layout.library, to: destination)
+        try LibraryArchive.write(directory: layout.libraryDirectory, to: destination)
     }
 
     /// Replaces the library with a backup. The current library is moved to the recovery folder, never deleted.
@@ -35,22 +35,14 @@ public struct LibraryBackup: Sendable {
         defer { try? fileManager.removeItem(at: staging) }
 
         try LibraryArchive.extract(archive, into: staging)
-        let restoredNotebooks = staging.appending(path: "Notebooks", directoryHint: .isDirectory)
-        guard fileManager.fileExists(atPath: restoredNotebooks.path(percentEncoded: false)) else {
+        let notebooks = LibraryLayout.notebooksDirectory(in: staging)
+        guard fileManager.fileExists(atPath: notebooks.path(percentEncoded: false)) else {
             throw LibraryBackupError.notABackup
         }
-
         let replaced = layout.recoveredDirectory.appending(
             path: "Library-before-restore-\(Int(now.timeIntervalSince1970))",
             directoryHint: .isDirectory
         )
-        try fileManager.moveItem(at: layout.library, to: replaced)
-        do {
-            try fileManager.moveItem(at: staging, to: layout.library)
-        } catch {
-            try? fileManager.moveItem(at: replaced, to: layout.library)
-            throw error
-        }
-        try await library.reload()
+        try await store.replaceLibrary(with: staging, keepingCurrentAt: replaced)
     }
 }

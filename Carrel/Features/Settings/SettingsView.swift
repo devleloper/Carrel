@@ -28,7 +28,12 @@ struct SettingsView: View {
                 ActivityView(items: [file.url])
             }
             .fileImporter(isPresented: $isChoosingBackup, allowedContentTypes: [.appleArchive]) { result in
-                backupToRestore = try? result.get()
+                switch result {
+                case .success(let url):
+                    backupToRestore = url
+                case .failure(let error):
+                    backup.errorMessage = UserFacingError.message(for: error)
+                }
             }
             .confirmationDialog(
                 "Restore from Backup?",
@@ -48,11 +53,7 @@ struct SettingsView: View {
                     """
                 )
             }
-            .alert("Something Went Wrong", isPresented: Binding(presenting: $backup.errorMessage)) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(backup.errorMessage ?? "")
-            }
+            .errorAlert($backup.errorMessage)
         }
     }
 

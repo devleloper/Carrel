@@ -3,13 +3,13 @@ import SwiftUI
 
 /// The editor: the page fills the window; glass controls float on the desk around it.
 struct NotebookEditorView: View {
-    let session: EditorSession
-    @State private var palette = ToolPaletteModel()
+    @Bindable var session: EditorSession
+    @Environment(ToolPaletteModel.self) private var palette
     @State private var quickPaletteLocation: CGPoint?
     @State private var isShowingOverview = false
     @State private var exportedFile: SharedFile?
-    @State private var renameDraft: String?
-    @State private var errorMessage: String?
+    @State private var isRenaming = false
+    @State private var titleDraft = ""
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -30,7 +30,10 @@ struct NotebookEditorView: View {
                 palette: palette,
                 onClose: close,
                 onShowOverview: { isShowingOverview = true },
-                onRename: { renameDraft = session.notebook.title },
+                onRename: {
+                    titleDraft = session.notebook.title
+                    isRenaming = true
+                },
                 onExport: { Task { await exportPDF() } }
             )
         }
@@ -45,32 +48,32 @@ struct NotebookEditorView: View {
         .sheet(item: $exportedFile) { file in
             ActivityView(items: [file.url])
         }
-        .alert("Rename Notebook", isPresented: Binding(presenting: $renameDraft)) {
-            TextField("Title", text: Binding(get: { renameDraft ?? "" }, set: { renameDraft = $0 }))
+        .alert("Rename Notebook", isPresented: $isRenaming) {
+            TextField("Title", text: $titleDraft)
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
-                let title = renameDraft ?? ""
-                Task { try? await session.rename(to: title) }
+                let title = titleDraft
+                Task { await session.rename(to: title) }
             }
         }
-        .alert("Something Went Wrong", isPresented: Binding(presenting: $errorMessage)) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage ?? "")
-        }
+        .errorAlert($session.errorMessage)
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
-                flushInBackground()
+                saveInBackground()
             }
         }
     }
 
+    /// The editor closes only once everything is on disk; if a write fails it stays open with the error.
     private func close() {
-        flushInBackground()
-        dismiss()
+        Task {
+            if await session.saveAll() {
+                dismiss()
+            }
+        }
     }
 
-    private func flushInBackground() {
+    private func saveInBackground() {
         let autosaver = session.autosaver
         BackgroundTask.run(named: "Save notebook") {
             await autosaver.flush()
@@ -81,7 +84,7 @@ struct NotebookEditorView: View {
         do {
             exportedFile = SharedFile(url: try await session.exportPDF())
         } catch {
-            errorMessage = UserFacingError.message(for: error)
+            session.errorMessage = UserFacingError.message(for: error)
         }
     }
 
@@ -176,7 +179,7 @@ private struct EditorTopBar: View {
         switch session.autosaver.status {
         case .saved: String(localized: "Saved")
         case .edited: String(localized: "Edited")
-        case .saving: String(localized: "Saving…")
+        case .stalled: String(localized: "Saving…")
         case .notSaved: String(localized: "Not Saved")
         }
     }
@@ -201,7 +204,7 @@ private struct EditorTopBar: View {
                     ForEach(PaperStyle.allCases, id: \.self) { style in
                         Button(style.title) {
                             let paper = Paper(style: style, tone: page.paper.tone)
-                            Task { try? await session.setPaper(paper, forPage: page.id) }
+                            Task { await session.setPaper(paper, forPage: page.id) }
                         }
                     }
                 }
@@ -209,41 +212,11 @@ private struct EditorTopBar: View {
                     ForEach(PaperTone.available, id: \.self) { tone in
                         Button(tone.title) {
                             let paper = Paper(style: page.paper.style, tone: tone)
-                            Task { try? await session.setPaperForAllPages(paper) }
+                            Task { await session.setPaperForAllPages(paper) }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-struct SharedFile: Identifiable {
-    let url: URL
-
-    var id: URL { url }
-}
-
-extension PaperStyle {
-    var title: LocalizedStringKey {
-        switch self {
-        case .blank: "Blank"
-        case .ruledNarrow: "Narrow Ruled"
-        case .ruledWide: "Wide Ruled"
-        case .ruledWithMargin: "Ruled with Margin"
-        case .grid: "Grid"
-        case .dots: "Dots"
-        }
-    }
-}
-
-extension PaperTone {
-    var title: LocalizedStringKey {
-        switch self {
-        case .white: "White"
-        case .cream: "Cream"
-        case .linen: "Linen"
-        case .night: "Night"
         }
     }
 }

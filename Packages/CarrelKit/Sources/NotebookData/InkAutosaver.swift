@@ -11,7 +11,8 @@ import Observation
 @Observable
 public final class InkAutosaver {
     public private(set) var status: SaveStatus = .saved
-    public private(set) var lastErrorDescription: String?
+    /// Why the last write failed. Set exactly while `status` is `.notSaved`.
+    public private(set) var lastError: (any Error)?
 
     private let store: NotebookStore
     private let policy: AutosavePolicy
@@ -20,7 +21,6 @@ public final class InkAutosaver {
     @ObservationIgnored private var firstUnsavedChange: ContinuousClock.Instant?
     @ObservationIgnored private var lastChange: ContinuousClock.Instant?
     @ObservationIgnored private var writingSince: ContinuousClock.Instant?
-    @ObservationIgnored private var lastWriteFailed = false
     @ObservationIgnored private var scheduledSave: Task<Void, Never>?
     @ObservationIgnored private var statusRefresh: Task<Void, Never>?
     @ObservationIgnored private var inFlightSave: Task<Void, Never>?
@@ -52,7 +52,16 @@ public final class InkAutosaver {
     public func flush() async {
         scheduledSave?.cancel()
         await save()
-        try? await store.writePendingManifestChanges()
+        do {
+            try await store.writePendingManifestChanges()
+            // Pages that failed to write are dirty again, so an empty set means every write has succeeded.
+            if dirtyPages.isEmpty {
+                lastError = nil
+            }
+        } catch {
+            lastError = error
+        }
+        refreshStatus()
     }
 
     private func scheduleSave(after delay: Duration? = nil) {
@@ -100,6 +109,7 @@ public final class InkAutosaver {
         firstUnsavedChange = nil
 
         var failedPages: Set<Page.ID> = []
+        var failure: (any Error)?
         for pageID in batch {
             guard let ink = encodeInk(pageID) else {
                 continue
@@ -110,27 +120,25 @@ public final class InkAutosaver {
                 continue
             } catch {
                 failedPages.insert(pageID)
-                lastErrorDescription = error.localizedDescription
+                failure = error
             }
         }
 
         writingSince = nil
-        lastWriteFailed = !failedPages.isEmpty
-        if lastWriteFailed {
+        if failure != nil {
             dirtyPages.formUnion(failedPages)
             firstUnsavedChange = min(firstUnsavedChange ?? batchStart, batchStart)
             scheduleSave(after: policy.retryDelay)
-        } else if dirtyPages.isEmpty {
-            lastErrorDescription = nil
-        } else {
+        } else if !dirtyPages.isEmpty {
             scheduleSave()
         }
+        lastError = failure
         refreshStatus()
     }
 
     private func refreshStatus() {
         let pendingSince = [firstUnsavedChange, writingSince].compactMap { $0 }.min()
-        status = policy.status(firstUnsavedChange: pendingSince, lastWriteFailed: lastWriteFailed, now: .now)
+        status = policy.status(firstUnsavedChange: pendingSince, lastWriteFailed: lastError != nil, now: .now)
         statusRefresh?.cancel()
         guard let pendingSince, status == .edited else {
             return

@@ -17,29 +17,30 @@ enum LibraryArchive {
                 mode: .writeOnly,
                 options: [.create, .truncate],
                 permissions: FilePermissions(rawValue: 0o644)
-            )
-        else {
-            throw LibraryArchiveError.cannotOpenStream
-        }
-        defer { try? fileStream.close() }
-
-        guard let compressionStream = ArchiveByteStream.compressionStream(using: .lzfse, writingTo: fileStream) else {
-            throw LibraryArchiveError.cannotOpenStream
-        }
-        defer { try? compressionStream.close() }
-
-        guard
+            ),
+            let compressionStream = ArchiveByteStream.compressionStream(using: .lzfse, writingTo: fileStream),
             let encodeStream = ArchiveStream.encodeStream(writingTo: compressionStream),
             let keySet = ArchiveHeader.FieldKeySet(fieldKeys)
         else {
             throw LibraryArchiveError.cannotOpenStream
         }
-        defer { try? encodeStream.close() }
-
-        try encodeStream.writeDirectoryContents(
-            archiveFrom: FilePath(directory.path(percentEncoded: false)),
-            keySet: keySet
-        )
+        do {
+            try encodeStream.writeDirectoryContents(
+                archiveFrom: FilePath(directory.path(percentEncoded: false)),
+                keySet: keySet
+            )
+            // Closing flushes the last compressed block; a failure here means a truncated backup, so it must
+            // reach the caller instead of being dropped by a cleanup `defer`.
+            try encodeStream.close()
+            try compressionStream.close()
+            try fileStream.close()
+        } catch {
+            try? encodeStream.close()
+            try? compressionStream.close()
+            try? fileStream.close()
+            try? FileManager.default.removeItem(at: destination)
+            throw error
+        }
     }
 
     static func extract(_ archive: URL, into directory: URL) throws {

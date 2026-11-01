@@ -1,3 +1,4 @@
+import Foundation
 import NotebookDomain
 import Testing
 
@@ -25,12 +26,18 @@ struct SortKeyTests {
     }
 
     @Test func repeatedInsertionInTheMiddleStaysOrdered() {
-        var keys = SortKey.sequence(count: 2)
+        let first = SortKey.initial
+        var keys = [first, SortKey.between(first, nil)]
         for _ in 0..<200 {
             keys.insert(.between(keys[0], keys[1]), at: 1)
         }
         #expect(keys == keys.sorted())
         #expect(Set(keys).count == keys.count)
+    }
+
+    @Test func encodesAsABareStringOnDisk() throws {
+        let data = try JSONEncoder().encode([SortKey(rawValue: "i")])
+        #expect(String(decoding: data, as: UTF8.self) == #"["i"]"#)
     }
 
     @Test func invertedNeighboursStillProduceAKeyAfterTheLowerOne() {

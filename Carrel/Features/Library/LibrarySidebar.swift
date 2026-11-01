@@ -6,22 +6,19 @@ struct LibrarySidebar: View {
     @Binding var isShowingSettings: Bool
     @State private var isCreatingFolder = false
     @State private var renamingFolder: Folder?
-    @State private var folderName = ""
+    @State private var titleDraft = ""
 
     var body: some View {
         List(selection: $model.section) {
-            Label("Library", systemImage: "books.vertical")
-                .tag(LibraryModel.Section.all)
-            Label("Favorites", systemImage: "star")
-                .tag(LibraryModel.Section.favorites)
+            row(.all)
+            row(.favorites)
 
             Section("Folders") {
                 ForEach(model.folders) { folder in
-                    Label(folder.title, systemImage: "folder")
-                        .tag(LibraryModel.Section.folder(folder.id))
+                    row(.folder(folder.id))
                         .contextMenu {
                             Button("Rename…", systemImage: "pencil") {
-                                folderName = folder.title
+                                titleDraft = folder.title
                                 renamingFolder = folder
                             }
                             Button("Delete Folder", systemImage: "trash", role: .destructive) {
@@ -30,14 +27,13 @@ struct LibrarySidebar: View {
                         }
                 }
                 Button("New Folder", systemImage: "folder.badge.plus") {
-                    folderName = ""
+                    titleDraft = ""
                     isCreatingFolder = true
                 }
                 .foregroundStyle(Theme.accent)
             }
 
-            Label("Trash", systemImage: "trash")
-                .tag(LibraryModel.Section.trash)
+            row(.trash)
         }
         .navigationTitle("Carrel")
         .toolbar {
@@ -48,20 +44,27 @@ struct LibrarySidebar: View {
             }
         }
         .alert("New Folder", isPresented: $isCreatingFolder) {
-            TextField("Name", text: $folderName)
+            TextField("Name", text: $titleDraft)
             Button("Cancel", role: .cancel) {}
             Button("Create") {
-                Task { await model.createFolder(named: folderName) }
+                let title = titleDraft
+                Task { await model.createFolder(named: title) }
             }
         }
         .alert("Rename Folder", isPresented: Binding(presenting: $renamingFolder)) {
-            TextField("Name", text: $folderName)
+            TextField("Name", text: $titleDraft)
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
                 if let folder = renamingFolder {
-                    Task { await model.renameFolder(folder, to: folderName) }
+                    let title = titleDraft
+                    Task { await model.renameFolder(folder, to: title) }
                 }
             }
         }
+    }
+
+    private func row(_ section: LibraryModel.Section) -> some View {
+        Label(model.title(of: section), systemImage: section.systemImage)
+            .tag(section)
     }
 }

@@ -38,4 +38,24 @@ struct VersionedFileTests {
             )
         }
     }
+
+    @Test func aDamagedGenerationIsMovedAsideWhenAnOlderOneIsUsed() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let current = directory.appending(path: "library.json")
+        let previous = directory.appending(path: "library.json.previous")
+        let recovered = directory.appending(path: "Recovered", directoryHint: .isDirectory)
+        try JSONCoding.encode(LibraryManifest()).write(to: previous)
+        try Data("{ damaged".utf8).write(to: current)
+
+        _ = try VersionedFile.read(
+            LibraryManifest.self,
+            from: [current, previous],
+            supportedSchemaVersion: LibraryManifest.currentSchemaVersion,
+            movingDamagedTo: recovered
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: current.path(percentEncoded: false)))
+        #expect(FileManager.default.directoryContents(at: recovered).count == 1)
+    }
 }

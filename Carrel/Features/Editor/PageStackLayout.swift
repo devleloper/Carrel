@@ -31,10 +31,21 @@ struct PageStackLayout: Equatable {
         contentSize = CGSize(width: contentWidth, height: y)
     }
 
-    /// Pages within half a screen of `visibleRect`, which should hold a live canvas, at most `limit` of them.
+    /// Pages within half a screen of `visibleRect`, which should hold a live canvas, in order.
+    ///
+    /// When more than `limit` pages are near, those closest to the middle of the screen win, so every visible
+    /// page can be written on even when short landscape pages fill the screen.
     func pagesNear(_ visibleRect: CGRect, limit: Int) -> [Int] {
         let nearby = visibleRect.insetBy(dx: 0, dy: -visibleRect.height / 2)
-        return Array(pageFrames.indices.filter { pageFrames[$0].intersects(nearby) }.prefix(limit))
+        let middle = visibleRect.midY
+        let distanceFromMiddle = { (index: Int) in
+            max(self.pageFrames[index].minY - middle, middle - self.pageFrames[index].maxY, 0)
+        }
+        return pageFrames.indices
+            .filter { pageFrames[$0].intersects(nearby) }
+            .sorted { distanceFromMiddle($0) < distanceFromMiddle($1) }
+            .prefix(limit)
+            .sorted()
     }
 
     /// The page that takes up most of `visibleRect`, considering only the first `count` pages.

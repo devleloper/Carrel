@@ -7,9 +7,19 @@ import SwiftUI
 enum PageInk {
     case editable(PKDrawing)
     case readOnly(message: String)
+
+    var drawing: PKDrawing? {
+        switch self {
+        case .editable(let drawing): drawing
+        case .readOnly: nil
+        }
+    }
 }
 
-/// One open notebook: its pages and the ink being edited. Saving is delegated to `InkAutosaver`.
+/// One open notebook: its pages and the ink being edited.
+///
+/// Ink is written by `InkAutosaver`; every change to the page structure is an intent of `NotebookStore`, so the
+/// rules for sort keys and modification dates live in one place and are tested there.
 @Observable
 final class EditorSession: Identifiable {
     let id: Notebook.ID
@@ -19,6 +29,7 @@ final class EditorSession: Identifiable {
     private(set) var pages: [Page] = []
     private(set) var trashedPages: [Page] = []
     private(set) var recoveryNotice: String?
+    var errorMessage: String?
     var currentPageIndex = 0
     /// Set by the page overview; the canvas scrolls there and clears it.
     var scrollTarget: Page.ID?
@@ -26,22 +37,33 @@ final class EditorSession: Identifiable {
     private let store: NotebookStore
     private let drawings: DrawingCache
 
-    private init(store: NotebookStore, manifest: NotebookManifest) {
+    private init(store: NotebookStore, manifest: NotebookManifest, autosavePolicy: AutosavePolicy) {
         let drawings = DrawingCache()
         self.id = manifest.notebook.id
         self.notebook = manifest.notebook
         self.store = store
         self.drawings = drawings
-        self.autosaver = InkAutosaver(store: store) { drawings.inkData(for: $0) }
+        self.autosaver = InkAutosaver(store: store, policy: autosavePolicy) { drawings.inkData(for: $0) }
         apply(manifest)
     }
 
-    static func open(_ store: NotebookStore) async -> EditorSession {
-        EditorSession(store: store, manifest: await store.manifest)
+    static func open(_ store: NotebookStore, autosavePolicy: AutosavePolicy = AutosavePolicy()) async -> EditorSession {
+        EditorSession(store: store, manifest: await store.manifest, autosavePolicy: autosavePolicy)
     }
 
     var currentPage: Page? {
         pages.indices.contains(currentPageIndex) ? pages[currentPageIndex] : nil
+    }
+
+    /// Writes everything now. Returns `false` and sets `errorMessage` when something could not be saved; the
+    /// editor then stays open, so unsaved strokes are not thrown away with it.
+    func saveAll() async -> Bool {
+        await autosaver.flush()
+        guard let error = autosaver.lastError else {
+            return true
+        }
+        errorMessage = UserFacingError.message(for: error)
+        return false
     }
 
     // MARK: Ink
@@ -51,6 +73,8 @@ final class EditorSession: Identifiable {
             return .editable(drawing)
         }
         let result = await store.ink(for: pageID)
+        // While the store was reading, the page may have been loaded by another caller or drawn on; the
+        // drawing in memory is newer than the file.
         if let drawing = drawings[pageID] {
             return .editable(drawing)
         }
@@ -62,8 +86,11 @@ final class EditorSession: Identifiable {
         case .recovered(let ink):
             recoveryNotice = String(localized: "A damaged page was restored from its last saved version.")
             return decode(ink, for: pageID)
-        case .unrecoverable:
-            recoveryNotice = String(localized: "A damaged page could not be restored. Its file was kept for recovery.")
+        case .damaged:
+            recoveryNotice = String(localized: "A damaged page could not be restored. Its files were kept.")
+            return .editable(PKDrawing())
+        case .missing:
+            recoveryNotice = String(localized: "The ink of a page is missing. The page was left blank.")
             return .editable(PKDrawing())
         case .requiresNewerSystem:
             return .readOnly(message: String(localized: "This page was written with a newer version of iPadOS."))
@@ -88,14 +115,12 @@ final class EditorSession: Identifiable {
         recoveryNotice = nil
     }
 
+    /// Read-only pages are exported with their paper only: their ink cannot be decoded on this system.
     func exportPDF() async throws -> URL {
         var contents: [PDFExporter.Content] = []
         for page in pages {
-            if case .editable(let drawing) = await ink(for: page.id) {
-                contents.append(PDFExporter.Content(page: page, drawing: drawing))
-            } else {
-                contents.append(PDFExporter.Content(page: page, drawing: nil))
-            }
+            let drawing = await ink(for: page.id).drawing
+            contents.append(PDFExporter.Content(page: page, drawing: drawing))
         }
         return try PDFExporter.export(title: notebook.title, pages: contents)
     }
@@ -110,87 +135,54 @@ final class EditorSession: Identifiable {
 
     // MARK: Pages
 
-    /// Adds a page after the last one. The manifest is written before any ink of the new page.
-    func appendPage() async throws -> Page {
-        let last = pages.last
-        let page = Page(
-            sortKey: .between(last?.sortKey, nil),
-            size: last?.size ?? notebook.defaultPageSize,
-            paper: last?.paper ?? notebook.defaultPaper,
-            now: .now
-        )
-        try await updateManifest { $0.pages.append(page) }
-        return page
+    /// Adds a page after the last one. Returns `nil` and sets `errorMessage` when the page could not be added.
+    func appendPage() async -> Page? {
+        await perform { try await store.appendPage() }
     }
 
-    func duplicatePage(_ pageID: Page.ID) async throws {
-        guard let index = pages.firstIndex(where: { $0.id == pageID }) else {
+    func duplicatePage(_ pageID: Page.ID) async {
+        // The store copies the page's ink file, so its latest strokes must be on disk first.
+        guard await saveAll() else {
             return
         }
-        let source = pages[index]
-        let nextKey = pages.indices.contains(index + 1) ? pages[index + 1].sortKey : nil
-        let copy = Page(sortKey: .between(source.sortKey, nextKey), size: source.size, paper: source.paper, now: .now)
-        try await updateManifest { $0.pages.append(copy) }
-        if case .editable(let drawing) = await ink(for: pageID), !drawing.strokes.isEmpty {
-            drawingDidChange(drawing, on: copy.id)
+        await perform { _ = try await store.duplicatePage(pageID) }
+    }
+
+    func movePage(_ pageID: Page.ID, by offset: Int) async {
+        await perform { try await store.movePage(pageID, by: offset) }
+    }
+
+    func moveToTrash(_ pageID: Page.ID) async {
+        await perform { try await store.setPageInTrash(pageID, true) }
+    }
+
+    func restore(_ pageID: Page.ID) async {
+        await perform { try await store.setPageInTrash(pageID, false) }
+    }
+
+    func setPaper(_ paper: Paper, forPage pageID: Page.ID) async {
+        await perform { try await store.setPaper(paper, forPage: pageID) }
+    }
+
+    func setPaperForAllPages(_ paper: Paper) async {
+        await perform { try await store.setPaperForAllPages(paper) }
+    }
+
+    func rename(to title: String) async {
+        await perform { try await store.rename(to: title) }
+    }
+
+    /// Runs a change of the notebook and shows the result. A failed change leaves the store as it was.
+    @discardableResult
+    private func perform<Value>(_ change: () async throws -> Value) async -> Value? {
+        do {
+            let value = try await change()
+            apply(await store.manifest)
+            return value
+        } catch {
+            errorMessage = UserFacingError.message(for: error)
+            return nil
         }
-    }
-
-    func movePage(_ pageID: Page.ID, by offset: Int) async throws {
-        guard let index = pages.firstIndex(where: { $0.id == pageID }), pages.indices.contains(index + offset) else {
-            return
-        }
-        let target = index + offset
-        let neighbours = offset < 0 ? (target - 1, target) : (target, target + 1)
-        let lower = pages.indices.contains(neighbours.0) ? pages[neighbours.0].sortKey : nil
-        let upper = pages.indices.contains(neighbours.1) ? pages[neighbours.1].sortKey : nil
-        let key = SortKey.between(lower, upper)
-        try await updatePage(pageID) { $0.sortKey = key }
-    }
-
-    func moveToTrash(_ pageID: Page.ID) async throws {
-        try await updatePage(pageID) { $0.deletedAt = .now }
-    }
-
-    func restore(_ pageID: Page.ID) async throws {
-        try await updatePage(pageID) { $0.deletedAt = nil }
-    }
-
-    func setPaper(_ paper: Paper, forPage pageID: Page.ID) async throws {
-        try await updatePage(pageID) { $0.paper = paper }
-    }
-
-    func setPaperForAllPages(_ paper: Paper) async throws {
-        try await updateManifest { manifest in
-            manifest.notebook.defaultPaper = paper
-            for index in manifest.pages.indices {
-                manifest.pages[index].paper = paper
-            }
-        }
-    }
-
-    func rename(to title: String) async throws {
-        guard let title = Title.normalized(title) else {
-            return
-        }
-        try await updateManifest { manifest in
-            manifest.notebook.title = title
-            manifest.notebook.modifiedAt = .now
-        }
-    }
-
-    private func updatePage(_ pageID: Page.ID, _ change: @escaping @Sendable (inout Page) -> Void) async throws {
-        try await updateManifest { manifest in
-            if let index = manifest.pageIndex(of: pageID) {
-                change(&manifest.pages[index])
-                manifest.pages[index].modifiedAt = .now
-            }
-        }
-    }
-
-    private func updateManifest(_ change: @Sendable (inout NotebookManifest) -> Void) async throws {
-        let manifest = try await store.updateManifest(change)
-        apply(manifest)
     }
 
     private func apply(_ manifest: NotebookManifest) {

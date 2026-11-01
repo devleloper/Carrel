@@ -1,5 +1,8 @@
 import Foundation
 
+/// The on-disk types in this module spell out their `CodingKeys` so that renaming a property in code cannot
+/// silently change the file format: a rename keeps the old key as the raw value. Golden-file tests in
+/// `NotebookDataTests` fail if a key changes.
 public struct Notebook: Identifiable, Hashable, Codable, Sendable {
     public let id: UUID
     public var title: String

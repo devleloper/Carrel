@@ -5,7 +5,7 @@ import NotebookData
 enum UserFacingError {
     static func message(for error: any Error) -> String {
         switch error {
-        case LibraryBackupError.insufficientSpace:
+        case LibraryBackupError.insufficientSpace, CocoaError.fileWriteOutOfSpace:
             String(localized: "There isn't enough free space on this iPad. Free up some space and try again.")
         case LibraryBackupError.notABackup:
             String(localized: "This file isn't a Carrel backup.")

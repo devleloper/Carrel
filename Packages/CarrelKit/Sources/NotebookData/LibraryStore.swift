@@ -6,13 +6,26 @@ public enum LibraryStoreError: Error, Equatable {
     case schemaNewerThanApp
 }
 
+/// A notebook package that exists but cannot be opened. Its files are left untouched.
+public struct UnreadableNotebook: Equatable, Sendable {
+    public let id: Notebook.ID
+    public let reason: NotebookStoreError
+}
+
+/// What the library holds: the notebooks it can open, and the packages it cannot.
+public struct LibraryContents: Equatable, Sendable {
+    public let notebooks: [Notebook]
+    public let unreadable: [UnreadableNotebook]
+}
+
 /// The catalog of the library: folders, the list of notebooks, and the single `NotebookStore` per open notebook.
 ///
 /// Every change to a notebook goes through its `NotebookStore`, even a rename from the library, so the editor
 /// and the library never hold two diverging copies of the same manifest.
 public actor LibraryStore {
     public nonisolated let layout: LibraryLayout
-    public static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
+    public static let trashRetentionDays = 30
+    public static let trashRetention = TimeInterval(trashRetentionDays * 24 * 60 * 60)
 
     private let supportedContentVersion: Int
     private var manifest: LibraryManifest
@@ -24,28 +37,29 @@ public actor LibraryStore {
         }
         self.layout = layout
         self.supportedContentVersion = supportedContentVersion
-        self.manifest = try Self.readManifest(layout)
+        self.manifest = try Self.readManifest(in: layout.libraryDirectory, movingDamagedTo: layout.recoveredDirectory)
     }
 
     /// A missing or unreadable `library.json` costs only folder names, never notebooks, so it starts empty.
-    private static func readManifest(_ layout: LibraryLayout) throws -> LibraryManifest {
+    private static func readManifest(
+        in libraryDirectory: URL,
+        movingDamagedTo recoveredDirectory: URL?
+    ) throws -> LibraryManifest {
         do {
             return try VersionedFile.read(
                 LibraryManifest.self,
-                from: [layout.manifestURL, layout.previousManifestURL],
-                supportedSchemaVersion: LibraryManifest.currentSchemaVersion
+                from: [
+                    LibraryLayout.manifestURL(in: libraryDirectory),
+                    LibraryLayout.previousManifestURL(in: libraryDirectory),
+                ],
+                supportedSchemaVersion: LibraryManifest.currentSchemaVersion,
+                movingDamagedTo: recoveredDirectory
             )
         } catch VersionedFileError.newerSchema {
             throw LibraryStoreError.schemaNewerThanApp
         } catch {
             return LibraryManifest()
         }
-    }
-
-    /// Forgets open notebooks and reads the library again, after its files were replaced by a restore.
-    public func reload() throws {
-        openStores.removeAll()
-        manifest = try Self.readManifest(layout)
     }
 
     /// Writes changes that open notebooks keep in memory, so the files on disk are complete.
@@ -57,22 +71,27 @@ public actor LibraryStore {
 
     // MARK: Notebooks
 
-    /// Every readable notebook, including those in the Trash. Unreadable packages are skipped, not deleted.
-    public func notebooks() async -> [Notebook] {
+    /// Every notebook, including those in the Trash, and the packages that cannot be read.
+    public func contents() async -> LibraryContents {
         var notebooks: [Notebook] = []
+        var unreadable: [UnreadableNotebook] = []
         let packages = FileManager.default.directoryContents(at: layout.notebooksDirectory)
-            .filter { $0.pathExtension == "notebook" }
         for url in packages {
-            guard let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent) else {
+            guard let id = LibraryLayout.notebookID(ofPackage: url) else {
                 continue
             }
             if let store = openStores[id] {
                 notebooks.append(await store.manifest.notebook)
-            } else if let manifest = try? NotebookStore.readManifest(of: NotebookPackage(url: url)) {
-                notebooks.append(manifest.notebook)
+                continue
+            }
+            do {
+                notebooks.append(try NotebookStore.readManifest(of: NotebookPackage(url: url)).notebook)
+            } catch {
+                let reason = error as? NotebookStoreError ?? .manifestUnreadable
+                unreadable.append(UnreadableNotebook(id: id, reason: reason))
             }
         }
-        return notebooks
+        return LibraryContents(notebooks: notebooks, unreadable: unreadable)
     }
 
     public func createNotebook(
@@ -83,7 +102,7 @@ public actor LibraryStore {
         folderID: Folder.ID?,
         now: Date = .now
     ) async throws -> Notebook {
-        let lastKey = await notebooks().map(\.sortKey).max()
+        let lastKey = await contents().notebooks.map(\.sortKey).max()
         let notebook = Notebook(
             title: title,
             folderID: folderID,
@@ -121,17 +140,17 @@ public actor LibraryStore {
         return store
     }
 
+    public func renameNotebook(_ notebookID: Notebook.ID, to title: String, now: Date = .now) async throws {
+        try await store(for: notebookID).rename(to: title, now: now)
+    }
+
+    /// Changes how a notebook is organized: favorite, folder or Trash. The modification date stays as it is.
     @discardableResult
-    public func updateNotebook(
+    public func organizeNotebook(
         _ notebookID: Notebook.ID,
-        now: Date = .now,
         _ change: @escaping @Sendable (inout Notebook) -> Void
     ) async throws -> Notebook {
-        let manifest = try await store(for: notebookID).updateManifest { manifest in
-            change(&manifest.notebook)
-            manifest.notebook.modifiedAt = now
-        }
-        return manifest.notebook
+        try await store(for: notebookID).organize(change)
     }
 
     public func deleteNotebookPermanently(_ notebookID: Notebook.ID) throws {
@@ -143,7 +162,7 @@ public actor LibraryStore {
     /// Removes notebooks and pages that have been in the Trash longer than `trashRetention`.
     public func purgeExpiredTrash(now: Date = .now) async {
         let cutoff = now.addingTimeInterval(-Self.trashRetention)
-        for notebook in await notebooks() {
+        for notebook in await contents().notebooks {
             if let deletedAt = notebook.deletedAt, deletedAt < cutoff {
                 try? deleteNotebookPermanently(notebook.id)
             } else if let store = try? store(for: notebook.id) {
@@ -164,7 +183,11 @@ public actor LibraryStore {
         return folder
     }
 
+    /// Renames a folder. A title that is blank after trimming is ignored, as it is for notebooks.
     public func renameFolder(_ folderID: Folder.ID, to title: String, now: Date = .now) throws {
+        guard let title = Title.normalized(title) else {
+            return
+        }
         try updateFolders { folders in
             guard let index = folders.firstIndex(where: { $0.id == folderID }) else {
                 return
@@ -176,8 +199,8 @@ public actor LibraryStore {
 
     /// Deletes a folder; its notebooks move to the top level rather than disappearing with it.
     public func deleteFolder(_ folderID: Folder.ID, now: Date = .now) async throws {
-        for notebook in await notebooks() where notebook.folderID == folderID {
-            try await updateNotebook(notebook.id, now: now) { $0.folderID = nil }
+        for notebook in await contents().notebooks where notebook.folderID == folderID {
+            try await organizeNotebook(notebook.id) { $0.folderID = nil }
         }
         try updateFolders { folders in
             guard let index = folders.firstIndex(where: { $0.id == folderID }) else {
@@ -192,5 +215,37 @@ public actor LibraryStore {
         change(&updated.folders)
         try VersionedFile.write(updated, to: layout.manifestURL, keepingPreviousAt: layout.previousManifestURL)
         manifest = updated
+    }
+
+    // MARK: Restore
+
+    /// Swaps in a library extracted to `staging` and keeps the current one at `replacedLocation`.
+    ///
+    /// The candidate is checked before anything moves, and the swap has no suspension point, so no other work on
+    /// this actor can observe a half-replaced library.
+    func replaceLibrary(with staging: URL, keepingCurrentAt replacedLocation: URL) throws {
+        let candidate = try Self.readManifest(in: staging, movingDamagedTo: nil)
+        let packages = FileManager.default.directoryContents(at: LibraryLayout.notebooksDirectory(in: staging))
+        for url in packages where LibraryLayout.notebookID(ofPackage: url) != nil {
+            do {
+                _ = try NotebookStore.readManifest(of: NotebookPackage(url: url))
+            } catch NotebookStoreError.schemaNewerThanApp {
+                throw LibraryStoreError.schemaNewerThanApp
+            } catch {
+                // An unreadable package is restored as it was backed up and listed as unreadable afterwards.
+                continue
+            }
+        }
+
+        let fileManager = FileManager.default
+        try fileManager.moveItem(at: layout.libraryDirectory, to: replacedLocation)
+        do {
+            try fileManager.moveItem(at: staging, to: layout.libraryDirectory)
+        } catch {
+            try? fileManager.moveItem(at: replacedLocation, to: layout.libraryDirectory)
+            throw error
+        }
+        openStores.removeAll()
+        manifest = candidate
     }
 }

@@ -6,6 +6,15 @@ enum EditorTool: Hashable {
     case highlighter
     case eraser
     case lasso
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .pen(let index): "Pen \(index + 1)"
+        case .highlighter: "Highlighter"
+        case .eraser: "Eraser"
+        case .lasso: "Lasso"
+        }
+    }
 }
 
 struct PenSettings: Codable, Hashable {
@@ -49,11 +58,11 @@ struct ToolSettings: Codable, Hashable {
 
     static let standard = ToolSettings(
         pens: [
-            PenSettings(inkType: .fountainPen, colorHex: 0x1E1E1C, width: 3),
-            PenSettings(inkType: .fountainPen, colorHex: 0x1649AE, width: 3),
-            PenSettings(inkType: .pen, colorHex: 0xCB380D, width: 2.5),
+            PenSettings(inkType: .fountainPen, colorHex: InkPalette.carbon.hex, width: 3),
+            PenSettings(inkType: .fountainPen, colorHex: InkPalette.inkBlue.hex, width: 3),
+            PenSettings(inkType: .pen, colorHex: InkPalette.vermilion.hex, width: 2.5),
         ],
-        highlighterHex: 0xFFE45C,
+        highlighterHex: InkPalette.yellow.hex,
         highlighterWidth: 22,
         isPreciseEraser: false,
         eraserWidth: 16
@@ -61,7 +70,9 @@ struct ToolSettings: Codable, Hashable {
 
     private static let defaultsKey = "toolSettings"
 
-    static func load(from defaults: UserDefaults = .standard) -> ToolSettings {
+    /// Settings saved with a different number of pens would leave palette slots without a pen, so they are
+    /// replaced by the standard palette.
+    static func load(from defaults: UserDefaults) -> ToolSettings {
         guard
             let data = defaults.data(forKey: defaultsKey),
             let settings = try? JSONDecoder().decode(ToolSettings.self, from: data),
@@ -72,24 +83,27 @@ struct ToolSettings: Codable, Hashable {
         return settings
     }
 
-    func save(to defaults: UserDefaults = .standard) {
+    func save(to defaults: UserDefaults) {
         if let data = try? JSONEncoder().encode(self) {
             defaults.set(data, forKey: Self.defaultsKey)
         }
     }
 }
 
+/// The selected tool and the user's palette, shared by every notebook so the pen stays in hand between them.
 @Observable
 final class ToolPaletteModel {
     var settings: ToolSettings {
-        didSet { settings.save() }
+        didSet { settings.save(to: defaults) }
     }
     private(set) var selection: EditorTool = .pen(0)
     var isRulerActive = false
     @ObservationIgnored private var previousSelection: EditorTool = .pen(0)
+    @ObservationIgnored private let defaults: UserDefaults
 
-    init(settings: ToolSettings = .load()) {
-        self.settings = settings
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        self.settings = ToolSettings.load(from: defaults)
     }
 
     func select(_ tool: EditorTool) {

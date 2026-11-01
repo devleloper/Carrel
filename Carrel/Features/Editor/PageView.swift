@@ -8,6 +8,11 @@ final class PageCanvasView: PKCanvasView {
     var isLoadingInk = false
     var isCreatingPage = false
 
+    /// Strokes on the next-page outline before their page exists; discarding the canvas would lose them.
+    var holdsInkWithoutPage: Bool {
+        pageID == nil && !drawing.strokes.isEmpty
+    }
+
     /// Shows the page at `scale` while keeping drawing coordinates in page points, independent of the device.
     func fit(_ pageSize: PageSize, scale: CGFloat) {
         minimumZoomScale = scale
@@ -34,11 +39,12 @@ final class PageView: UIView {
     var outlineSize = PageSize.a4
 
     private(set) var canvas: PageCanvasView?
+    /// Points on screen per point of page.
+    private(set) var scale: CGFloat = 1
     private let paperView = PaperView()
     private let inkImageView = UIImageView()
     private let unavailableLabel = UILabel()
     private let outlineLayer = CAShapeLayer()
-    private var scale: CGFloat = 1
 
     var paper: Paper {
         page?.paper ?? outlinePaper
@@ -68,7 +74,6 @@ final class PageView: UIView {
         layer.addSublayer(outlineLayer)
 
         layer.shadowColor = Palette.pageShadow.cgColor
-        layer.shadowOpacity = 0.12
         layer.shadowRadius = 6
         layer.shadowOffset = CGSize(width: 0, height: 2)
         updateOutline()
@@ -127,7 +132,7 @@ final class PageView: UIView {
         let isOutline = page == nil && canvas?.pageID == nil
         outlineLayer.isHidden = !isOutline
         paperView.alpha = isOutline ? 0.45 : 1
-        layer.shadowOpacity = isOutline ? 0 : 0.12
+        layer.shadowOpacity = isOutline ? 0 : Float(Theme.Elevation.page)
     }
 
     func pageDidMaterialize() {

@@ -8,8 +8,9 @@ struct CarrelApp: App {
         WindowGroup {
             switch dependencies {
             case .success(let dependencies):
-                LibraryView(model: dependencies.library)
-                    .environment(dependencies.backup)
+                LibraryView(model: dependencies.libraryModel)
+                    .environment(dependencies.backupModel)
+                    .environment(dependencies.toolPalette)
             case .failure(let error):
                 ContentUnavailableView {
                     Label("Carrel Can't Open Your Library", systemImage: "exclamationmark.triangle")

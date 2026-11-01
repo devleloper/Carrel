@@ -1,3 +1,4 @@
+import NotebookData
 import NotebookDomain
 import SwiftUI
 
@@ -9,6 +10,7 @@ struct PageOverviewView: View {
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: Theme.Spacing.xl)]
 
     var body: some View {
+        @Bindable var session = session
         NavigationStack {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: Theme.Spacing.xl) {
@@ -45,25 +47,26 @@ struct PageOverviewView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .errorAlert($session.errorMessage)
         }
     }
 
     @ViewBuilder
     private func pageActions(for page: Page, at index: Int) -> some View {
         Button("Duplicate", systemImage: "plus.square.on.square") {
-            Task { try? await session.duplicatePage(page.id) }
+            Task { await session.duplicatePage(page.id) }
         }
         Button("Move Earlier", systemImage: "arrow.up") {
-            Task { try? await session.movePage(page.id, by: -1) }
+            Task { await session.movePage(page.id, by: -1) }
         }
         .disabled(index == 0)
         Button("Move Later", systemImage: "arrow.down") {
-            Task { try? await session.movePage(page.id, by: 1) }
+            Task { await session.movePage(page.id, by: 1) }
         }
         .disabled(index == session.pages.count - 1)
         Divider()
         Button("Delete", systemImage: "trash", role: .destructive) {
-            Task { try? await session.moveToTrash(page.id) }
+            Task { await session.moveToTrash(page.id) }
         }
         .disabled(session.pages.count == 1)
     }
@@ -72,7 +75,7 @@ struct PageOverviewView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.m) {
             Text("Recently Deleted")
                 .font(.headline)
-            Text("Deleted pages are kept for 30 days.")
+            Text("Deleted pages are kept for \(LibraryStore.trashRetentionDays) days.")
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
             ScrollView(.horizontal) {
@@ -82,7 +85,7 @@ struct PageOverviewView: View {
                             PageThumbnail(session: session, page: page)
                                 .frame(width: 110)
                             Button("Restore") {
-                                Task { try? await session.restore(page.id) }
+                                Task { await session.restore(page.id) }
                             }
                             .font(.footnote)
                         }
@@ -109,23 +112,9 @@ struct PageThumbnail: View {
             }
         }
         .aspectRatio(page.size.width / page.size.height, contentMode: .fit)
-        .shadow(color: Theme.pageShadow.opacity(0.15), radius: 4, y: 2)
+        .shadow(color: Theme.pageShadow.opacity(Theme.Elevation.page), radius: 4, y: 2)
         .task(id: page.inkHash) {
             inkImage = await session.thumbnail(for: page, scale: CGFloat(160 / page.size.width) * displayScale)
-        }
-    }
-}
-
-struct PaperPreview: View {
-    let paper: Paper
-    let size: PageSize
-
-    var body: some View {
-        Canvas { context, canvasSize in
-            context.withCGContext { cgContext in
-                let bounds = CGRect(origin: .zero, size: canvasSize)
-                PaperRenderer.draw(paper, pageSize: size, in: bounds, context: cgContext)
-            }
         }
     }
 }

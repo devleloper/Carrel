@@ -25,15 +25,28 @@ struct PageStackLayoutTests {
         #expect(layout.pageFrames[0].midX == layout.contentSize.width / 2)
     }
 
-    @Test func onlyPagesNearTheVisibleAreaGetLiveCanvases() {
-        let layout = PageStackLayout(pageSizes: Array(repeating: .a4, count: 10), containerWidth: 800, zoom: 1)
+    @Test func pagesWithinHalfAScreenOfTheVisibleAreaGetLiveCanvases() {
+        let layout = PageStackLayout(
+            pageSizes: Array(repeating: .a4, count: 10),
+            containerWidth: 800,
+            zoom: 1,
+            metrics: metrics
+        )
         let visible = CGRect(x: 0, y: layout.pageFrames[4].minY, width: 800, height: 600)
 
-        let live = layout.pagesNear(visible, limit: 4)
+        #expect(layout.pagesNear(visible, limit: 4) == [3, 4])
+    }
 
-        #expect(live.contains(4))
-        #expect(!live.contains(0))
-        #expect(live.count <= 4)
+    @Test func visiblePagesKeepTheirCanvasesWhenMorePagesAreNearThanTheLimit() {
+        let layout = PageStackLayout(
+            pageSizes: Array(repeating: PageSize.a4.landscape, count: 12),
+            containerWidth: 800,
+            zoom: 1,
+            metrics: metrics
+        )
+        let visible = CGRect(x: 0, y: layout.pageFrames[4].minY + 400, width: 800, height: 1300)
+
+        #expect(layout.pagesNear(visible, limit: 4) == [4, 5, 6, 7])
     }
 
     @Test func theMostVisiblePageIgnoresTheNextPageOutline() {

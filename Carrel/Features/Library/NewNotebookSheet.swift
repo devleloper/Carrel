@@ -79,7 +79,7 @@ struct NewNotebookSheet: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(CoverAppearance(preset).name)
+        .accessibilityLabel(Text(CoverAppearance(preset).name))
         .accessibilityAddTraits(draft.cover == preset ? .isSelected : [])
     }
 }

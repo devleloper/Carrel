@@ -17,20 +17,36 @@ final class LibraryModel {
         case favorites
         case trash
         case folder(Folder.ID)
+
+        var systemImage: String {
+            switch self {
+            case .all: "books.vertical"
+            case .favorites: "star"
+            case .trash: "trash"
+            case .folder: "folder"
+            }
+        }
     }
 
     private(set) var notebooks: [Notebook] = []
     private(set) var folders: [Folder] = []
+    /// Notebook packages that exist but cannot be opened. They are never deleted, only reported.
+    private(set) var unreadableNotebookCount = 0
+    /// `nil` only while the sidebar list has no selection; it then shows the whole library.
     var section: Section? = .all
     var searchText = ""
     var errorMessage: String?
 
-    private let library: LibraryStore
+    private let store: LibraryStore
     private let snapshots: SnapshotStore
 
-    init(library: LibraryStore, snapshots: SnapshotStore) {
-        self.library = library
+    init(store: LibraryStore, snapshots: SnapshotStore) {
+        self.store = store
         self.snapshots = snapshots
+    }
+
+    var currentSection: Section {
+        section ?? .all
     }
 
     var visibleNotebooks: [Notebook] {
@@ -40,8 +56,8 @@ final class LibraryModel {
         return matching.sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
-    var sectionTitle: String {
-        switch section ?? .all {
+    func title(of section: Section) -> String {
+        switch section {
         case .all:
             String(localized: "Library")
         case .favorites:
@@ -54,7 +70,7 @@ final class LibraryModel {
     }
 
     private func isInCurrentSection(_ notebook: Notebook) -> Bool {
-        switch section ?? .all {
+        switch currentSection {
         case .all:
             !notebook.isInTrash
         case .favorites:
@@ -67,19 +83,21 @@ final class LibraryModel {
     }
 
     private var currentFolderID: Folder.ID? {
-        if case .folder(let folderID) = section {
+        if case .folder(let folderID) = currentSection {
             return folderID
         }
         return nil
     }
 
     func load() async {
-        notebooks = await library.notebooks()
-        folders = await library.folders()
+        let contents = await store.contents()
+        notebooks = contents.notebooks
+        unreadableNotebookCount = contents.unreadable.count
+        folders = await store.folders()
     }
 
     func purgeExpiredTrashAndLoad() async {
-        await library.purgeExpiredTrash()
+        await store.purgeExpiredTrash()
         await load()
     }
 
@@ -89,65 +107,56 @@ final class LibraryModel {
         let title = Title.normalized(draft.title) ?? String(localized: "Untitled")
         let folderID = currentFolderID
         return await perform {
-            let notebook = try await library.createNotebook(
+            try await store.createNotebook(
                 title: title,
                 cover: Cover(preset: draft.cover),
                 paper: draft.paper,
                 pageSize: draft.pageSize,
                 folderID: folderID
             )
-            await load()
-            return notebook
         }
     }
 
     /// Opens a notebook for editing, after taking a snapshot of it as it was before this session.
     func openSession(for notebook: Notebook) async -> EditorSession? {
-        await perform {
-            let store = try await library.store(for: notebook.id)
-            try await store.writePendingManifestChanges()
+        do {
+            let notebookStore = try await store.store(for: notebook.id)
             // A snapshot is a safety net: failing to take one must not keep the user from their notes.
-            try? snapshots.takeSnapshot(of: notebook.id)
-            return await EditorSession.open(store)
+            try? await snapshots.takeSnapshot(of: notebookStore)
+            return await EditorSession.open(notebookStore)
+        } catch {
+            errorMessage = UserFacingError.message(for: error)
+            return nil
         }
     }
 
     func rename(_ notebook: Notebook, to title: String) async {
-        guard let title = Title.normalized(title) else {
-            return
-        }
-        await update(notebook) { $0.title = title }
+        await perform { try await store.renameNotebook(notebook.id, to: title) }
     }
 
     func toggleFavorite(_ notebook: Notebook) async {
         let isFavorite = !notebook.isFavorite
-        await update(notebook) { $0.isFavorite = isFavorite }
+        await organize(notebook) { $0.isFavorite = isFavorite }
     }
 
     func move(_ notebook: Notebook, to folderID: Folder.ID?) async {
-        await update(notebook) { $0.folderID = folderID }
+        await organize(notebook) { $0.folderID = folderID }
     }
 
-    func moveToTrash(_ notebook: Notebook) async {
-        await update(notebook) { $0.deletedAt = .now }
+    func moveToTrash(_ notebook: Notebook, now: Date = .now) async {
+        await organize(notebook) { $0.deletedAt = now }
     }
 
     func restore(_ notebook: Notebook) async {
-        await update(notebook) { $0.deletedAt = nil }
+        await organize(notebook) { $0.deletedAt = nil }
     }
 
     func deletePermanently(_ notebook: Notebook) async {
-        await perform {
-            try await library.deleteNotebookPermanently(notebook.id)
-            await load()
-        }
+        await perform { try await store.deleteNotebookPermanently(notebook.id) }
     }
 
-    private func update(_ notebook: Notebook, _ change: @escaping @Sendable (inout Notebook) -> Void) async {
-        await perform {
-            try await library.updateNotebook(notebook.id, change)
-            await load()
-        }
+    private func organize(_ notebook: Notebook, _ change: @escaping @Sendable (inout Notebook) -> Void) async {
+        await perform { try await store.organizeNotebook(notebook.id, change) }
     }
 
     // MARK: Folders
@@ -156,40 +165,34 @@ final class LibraryModel {
         guard let title = Title.normalized(title) else {
             return
         }
-        await perform {
-            let folder = try await library.createFolder(title: title)
-            await load()
+        if let folder = await perform({ try await store.createFolder(title: title) }) {
             section = .folder(folder.id)
         }
     }
 
     func renameFolder(_ folder: Folder, to title: String) async {
-        guard let title = Title.normalized(title) else {
-            return
-        }
-        await perform {
-            try await library.renameFolder(folder.id, to: title)
-            await load()
-        }
+        await perform { try await store.renameFolder(folder.id, to: title) }
     }
 
     func deleteFolder(_ folder: Folder) async {
-        await perform {
-            try await library.deleteFolder(folder.id)
-            if section == .folder(folder.id) {
-                section = .all
-            }
-            await load()
+        let deleted = await perform { try await store.deleteFolder(folder.id) } != nil
+        if deleted, section == .folder(folder.id) {
+            section = .all
         }
     }
 
+    /// Runs a change, then reloads the library even if the change failed: a change that fails halfway, such as
+    /// deleting a folder, may already have moved some notebooks.
     @discardableResult
-    private func perform<Value>(_ operation: () async throws -> Value) async -> Value? {
+    private func perform<Value>(_ change: () async throws -> Value) async -> Value? {
+        let value: Value?
         do {
-            return try await operation()
+            value = try await change()
         } catch {
             errorMessage = UserFacingError.message(for: error)
-            return nil
+            value = nil
         }
+        await load()
+        return value
     }
 }

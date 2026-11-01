@@ -42,22 +42,13 @@ struct NotebookCoverView: View {
             }
         }
         .aspectRatio(0.72, contentMode: .fit)
-        .shadow(color: Theme.pageShadow.opacity(0.22), radius: 6, x: 0, y: 4)
+        .shadow(color: Theme.pageShadow.opacity(Theme.Elevation.cover), radius: 6, x: 0, y: 4)
     }
 
-    /// Leather catches more light than cloth or paper, so its sheen is stronger.
     private var materialShading: LinearGradient {
-        let highlight =
-            switch appearance.material {
-            case .leather:
-                0.16
-            case .cloth, .linen:
-                0.08
-            case .kraft, .plain:
-                0.05
-            }
+        let sheen = appearance.material.sheen
         return LinearGradient(
-            colors: [.white.opacity(highlight), .clear, .black.opacity(highlight)],
+            colors: [.white.opacity(sheen), .clear, .black.opacity(sheen)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -65,14 +56,14 @@ struct NotebookCoverView: View {
 
     private func label(_ title: String) -> some View {
         Text(title)
-            .font(.system(.subheadline, design: .serif, weight: .semibold))
+            .font(.serifTitle(.subheadline))
             .foregroundStyle(Color(uiColor: Palette.coverLabelText))
             .multilineTextAlignment(.center)
             .lineLimit(3)
             .padding(.horizontal, Theme.Spacing.s)
             .padding(.vertical, Theme.Spacing.s)
             .frame(maxWidth: .infinity)
-            .background(appearance.label, in: .rect(cornerRadius: 3))
+            .background(Color(uiColor: Palette.coverLabelPaper), in: .rect(cornerRadius: 3))
             .padding(.leading, 22)
             .padding(.trailing, 12)
             .frame(maxHeight: .infinity, alignment: .top)

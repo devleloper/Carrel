@@ -1,3 +1,4 @@
+import NotebookData
 import NotebookDomain
 import SwiftUI
 
@@ -19,7 +20,7 @@ struct LibraryView: View {
         } detail: {
             NavigationStack {
                 notebookGrid
-                    .navigationTitle(model.sectionTitle)
+                    .navigationTitle(model.title(of: model.currentSection))
                     .searchable(text: $model.searchText, prompt: "Search Notebooks")
                     .toolbar { newNotebookButton }
             }
@@ -40,15 +41,12 @@ struct LibraryView: View {
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
                 if let notebook = renamingNotebook {
-                    Task { await model.rename(notebook, to: titleDraft) }
+                    let title = titleDraft
+                    Task { await model.rename(notebook, to: title) }
                 }
             }
         }
-        .alert("Something Went Wrong", isPresented: Binding(presenting: $model.errorMessage)) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.errorMessage ?? "")
-        }
+        .errorAlert($model.errorMessage)
         .task { await model.purgeExpiredTrashAndLoad() }
     }
 
@@ -66,6 +64,9 @@ struct LibraryView: View {
 
     private var notebookGrid: some View {
         ScrollView {
+            if model.unreadableNotebookCount > 0, model.currentSection == .all {
+                unreadableNotice
+            }
             LazyVGrid(columns: columns, spacing: Theme.Spacing.xxl) {
                 ForEach(model.visibleNotebooks) { notebook in
                     notebookCard(notebook)
@@ -92,7 +93,7 @@ struct LibraryView: View {
                 NotebookCoverView(preset: notebook.cover.preset, title: notebook.title, isFavorite: notebook.isFavorite)
                     .matchedTransitionSource(id: notebook.id, in: coverNamespace)
                 Text(notebook.title)
-                    .font(.system(.headline, design: .serif))
+                    .font(.serifTitle(.headline))
                     .foregroundStyle(Theme.primaryText)
                     .lineLimit(1)
                 Text(notebook.modifiedAt, format: .relative(presentation: .named))
@@ -146,14 +147,30 @@ struct LibraryView: View {
         }
     }
 
+    /// Damaged notebooks are not hidden silently: their files stay in place, and the user learns they exist.
+    private var unreadableNotice: some View {
+        Label {
+            Text(
+                "\(model.unreadableNotebookCount) notebooks can't be opened. Their files were kept unchanged."
+            )
+        } icon: {
+            Image(systemName: "exclamationmark.triangle")
+        }
+        .font(.subheadline)
+        .foregroundStyle(Theme.secondaryText)
+        .padding(Theme.Spacing.m)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.top, Theme.Spacing.l)
+    }
+
     @ViewBuilder
     private var emptyState: some View {
-        switch model.section ?? .all {
+        switch model.currentSection {
         case .trash:
             ContentUnavailableView(
                 "Trash Is Empty",
                 systemImage: "trash",
-                description: Text("Deleted notebooks stay here for 30 days.")
+                description: Text("Deleted notebooks stay here for \(LibraryStore.trashRetentionDays) days.")
             )
         case .favorites:
             ContentUnavailableView(

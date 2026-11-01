@@ -18,7 +18,7 @@ struct AutosavePolicyTests {
     @Test func statusReflectsUnsavedChanges() {
         #expect(policy.status(firstUnsavedChange: nil, lastWriteFailed: false, now: start) == .saved)
         #expect(policy.status(firstUnsavedChange: start, lastWriteFailed: false, now: start + .seconds(3)) == .edited)
-        #expect(policy.status(firstUnsavedChange: start, lastWriteFailed: false, now: start + .seconds(8)) == .saving)
+        #expect(policy.status(firstUnsavedChange: start, lastWriteFailed: false, now: start + .seconds(8)) == .stalled)
         #expect(policy.status(firstUnsavedChange: start, lastWriteFailed: true, now: start) == .notSaved)
     }
 

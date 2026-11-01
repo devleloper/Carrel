@@ -10,6 +10,18 @@ struct InkAutosaverTests {
     /// Ink the autosaver reads at write time, standing in for the editor's live drawings.
     final class InkSource {
         var inks: [Page.ID: InkData] = [:]
+        private(set) var reads: [InkData] = []
+        /// Runs once, on the first read, while that write is still in flight.
+        var onFirstRead: (() -> Void)?
+
+        func ink(for pageID: Page.ID) -> InkData? {
+            let ink = inks[pageID]
+            ink.map { reads.append($0) }
+            let hook = onFirstRead
+            onFirstRead = nil
+            hook?()
+            return ink
+        }
     }
 
     private let fastPolicy = AutosavePolicy(
@@ -20,7 +32,7 @@ struct InkAutosaverTests {
     )
 
     private func makeAutosaver(_ fixture: NotebookFixture, source: InkSource, policy: AutosavePolicy) -> InkAutosaver {
-        InkAutosaver(store: fixture.store, policy: policy) { source.inks[$0] }
+        InkAutosaver(store: fixture.store, policy: policy) { source.ink(for: $0) }
     }
 
     @Test func flushWritesTheInkAsItIsAtSaveTime() async throws {
@@ -66,20 +78,24 @@ struct InkAutosaverTests {
         #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 3)))
     }
 
-    @Test func overlappingFlushesNeverLeaveOlderInkOnDisk() async throws {
+    @Test func aChangeDuringAWriteIsWrittenAfterIt() async throws {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
         let source = InkSource()
         let autosaver = makeAutosaver(fixture, source: source, policy: AutosavePolicy())
-
+        var secondFlush: Task<Void, Never>?
         source.inks[fixture.pageID] = .sample(seed: 1)
-        autosaver.pageDidChange(fixture.pageID)
-        async let firstFlush: Void = autosaver.flush()
-        source.inks[fixture.pageID] = .sample(seed: 2)
+        source.onFirstRead = {
+            source.inks[fixture.pageID] = .sample(seed: 2)
+            autosaver.pageDidChange(fixture.pageID)
+            secondFlush = Task { await autosaver.flush() }
+        }
+
         autosaver.pageDidChange(fixture.pageID)
         await autosaver.flush()
-        await firstFlush
+        await secondFlush?.value
 
+        #expect(source.reads == [.sample(seed: 1), .sample(seed: 2)])
         #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
     }
 
@@ -95,10 +111,13 @@ struct InkAutosaverTests {
         autosaver.pageDidChange(fixture.pageID)
         await autosaver.flush()
         #expect(autosaver.status == .notSaved)
+        #expect(autosaver.lastError != nil)
 
         let inkDirectory = fixture.store.package.inkDirectory
         try FileManager.default.createDirectory(at: inkDirectory, withIntermediateDirectories: true)
         await autosaver.flush()
         #expect(autosaver.status == .saved)
+        #expect(autosaver.lastError == nil)
+        #expect(try await fixture.reopen().ink(for: fixture.pageID) == .ink(.sample(seed: 2)))
     }
 }

@@ -44,17 +44,17 @@ public struct AutosavePolicy: Sendable {
         guard let firstUnsavedChange else {
             return .saved
         }
-        return now >= stallDeadline(firstUnsavedChange: firstUnsavedChange) ? .saving : .edited
+        return now >= stallDeadline(firstUnsavedChange: firstUnsavedChange) ? .stalled : .edited
     }
 }
 
 public enum SaveStatus: Hashable, Sendable {
     /// Everything is on disk.
     case saved
-    /// Unsaved changes are younger than the save deadline; this is the normal state while writing.
+    /// Unsaved changes are younger than the stall deadline; this is the normal state while writing.
     case edited
     /// A save is overdue, which only happens when the disk is slow or busy.
-    case saving
+    case stalled
     /// The last write failed; changes stay in memory and are retried.
     case notSaved
 }

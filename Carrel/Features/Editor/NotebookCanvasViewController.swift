@@ -23,6 +23,8 @@ final class NotebookCanvasViewController: UIViewController {
 
     private let maximumZoom: CGFloat = 4
     private let maximumLiveCanvases = 4
+    private let layoutMetrics = PageStackLayout.Metrics()
+    private static let directTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
 
     // Canvases get a delegate that implements no scroll-view callbacks, so PencilKit keeps full control of its
     // own zooming and scrolling.
@@ -81,14 +83,13 @@ final class NotebookCanvasViewController: UIViewController {
     }
 
     private func configureScrollView() {
-        let fingersOnly = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         scrollView.delegate = self
         scrollView.backgroundColor = .clear
         // Delaying touches would add latency to the first point of every stroke.
         scrollView.delaysContentTouches = false
         scrollView.contentInsetAdjustmentBehavior = .always
-        scrollView.panGestureRecognizer.allowedTouchTypes = fingersOnly
-        scrollView.pinchGestureRecognizer?.allowedTouchTypes = fingersOnly
+        scrollView.panGestureRecognizer.allowedTouchTypes = Self.directTouchTypes
+        scrollView.pinchGestureRecognizer?.allowedTouchTypes = Self.directTouchTypes
         scrollView.frame = view.bounds
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(scrollView)
@@ -151,7 +152,7 @@ final class NotebookCanvasViewController: UIViewController {
             return
         }
         let frame = documentView.convert(pageView.frame, to: scrollView)
-        let target = CGPoint(x: scrollView.contentOffset.x, y: frame.minY - PageStackLayout.Metrics().pageSpacing)
+        let target = CGPoint(x: scrollView.contentOffset.x, y: frame.minY - layoutMetrics.pageSpacing)
         scrollView.setContentOffset(clampedOffset(target), animated: true)
     }
 
@@ -175,7 +176,8 @@ final class NotebookCanvasViewController: UIViewController {
         let layout = PageStackLayout(
             pageSizes: pageViews.map(\.pageSize),
             containerWidth: view.bounds.width,
-            zoom: zoom
+            zoom: zoom,
+            metrics: layoutMetrics
         )
         for (pageView, frame) in zip(pageViews, layout.pageFrames) {
             pageView.frame = frame
@@ -213,7 +215,7 @@ final class NotebookCanvasViewController: UIViewController {
         for (index, pageView) in pageViews.enumerated() {
             if live.contains(index), pageView.canvas == nil {
                 attachCanvas(to: pageView)
-            } else if !live.contains(index), pageView.canvas != nil {
+            } else if !live.contains(index), let canvas = pageView.canvas, !canvas.holdsInkWithoutPage {
                 discardCanvas(of: pageView)
             }
         }
@@ -256,6 +258,7 @@ final class NotebookCanvasViewController: UIViewController {
                 canvas.drawing = drawing
                 canvas.isDrawingEnabled = true
             case .readOnly(let message):
+                // Drawing stays disabled, so ink this system cannot read is never overwritten.
                 pageView.showUnavailable(message)
             }
             canvas.isLoadingInk = false
@@ -266,7 +269,7 @@ final class NotebookCanvasViewController: UIViewController {
         guard let canvas = pageView.canvas else {
             return
         }
-        let scale = pageView.bounds.width / CGFloat(pageView.pageSize.width) * traitCollection.displayScale
+        let scale = pageView.scale * traitCollection.displayScale
         let image = pageView.page.flatMap { session.inkImage(for: $0, scale: scale) }
         canvas.delegate = nil
         undoManager?.removeAllActions(withTarget: canvas)
@@ -289,7 +292,8 @@ final class NotebookCanvasViewController: UIViewController {
         }
     }
 
-    /// The first stroke on the next-page outline makes it a real page.
+    /// The first stroke on the next-page outline makes it a real page. If that fails, the session shows the
+    /// error and the strokes stay on the outline; the next stroke tries again.
     private func createPage(from canvas: PageCanvasView) {
         guard !canvas.isCreatingPage, !canvas.drawing.strokes.isEmpty else {
             return
@@ -297,7 +301,7 @@ final class NotebookCanvasViewController: UIViewController {
         canvas.isCreatingPage = true
         Task {
             defer { canvas.isCreatingPage = false }
-            guard let page = try? await session.appendPage() else {
+            guard let page = await session.appendPage() else {
                 return
             }
             canvas.pageID = page.id
@@ -316,7 +320,7 @@ final class NotebookCanvasViewController: UIViewController {
     private func addFingerTap(touches: Int, action: Selector) {
         let tap = UITapGestureRecognizer(target: self, action: action)
         tap.numberOfTouchesRequired = touches
-        tap.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+        tap.allowedTouchTypes = Self.directTouchTypes
         scrollView.addGestureRecognizer(tap)
     }
 

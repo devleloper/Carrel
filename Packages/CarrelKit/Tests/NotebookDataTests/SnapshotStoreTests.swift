@@ -5,7 +5,7 @@ import Testing
 @testable import NotebookData
 
 struct SnapshotStoreTests {
-    @Test func keepsRecentSessionsAndOnePerDay() throws {
+    @Test func keepsRecentSessionsAndTheNewestOfEachDay() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -17,28 +17,29 @@ struct SnapshotStoreTests {
                 withIntermediateDirectories: true
             )
         }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
 
-        SnapshotStore.prune(directory, now: now, calendar: Calendar(identifier: .gregorian))
+        SnapshotStore.prune(directory, now: now, calendar: calendar)
 
-        #expect(FileManager.default.directoryContents(at: directory).count == 6)
+        let kept = Set(FileManager.default.directoryContents(at: directory).map(\.lastPathComponent))
+        let expectedAges: [TimeInterval] = [0, 60, 120, 180, 240, 86_400 * 2]
+        #expect(kept == Set(expectedAges.map { "\(Int(now.timeIntervalSince1970 - $0)).notebook" }))
     }
 
-    @Test func snapshotCopiesTheNotebookPackage() async throws {
-        let root = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let layout = LibraryLayout(root: root)
-        let library = try LibraryStore(layout: layout, supportedContentVersion: 5)
-        let notebook = try await library.createNotebook(
-            title: "Chemistry",
-            cover: Cover(preset: .sageLinen),
-            paper: .standard,
-            pageSize: .a4,
-            folderID: nil
-        )
+    @Test func snapshotIncludesChangesStillHeldInMemory() async throws {
+        let fixture = try NotebookFixture()
+        defer { fixture.remove() }
+        try await fixture.store.saveInk(.sample(seed: 1), for: fixture.pageID)
+        try await fixture.store.saveInk(.sample(seed: 2), for: fixture.pageID)
+        let layout = LibraryLayout(root: fixture.directory)
 
-        try SnapshotStore(layout: layout).takeSnapshot(of: notebook.id)
+        try await SnapshotStore(layout: layout).takeSnapshot(of: fixture.store)
 
-        let snapshots = FileManager.default.directoryContents(at: layout.snapshotsDirectory(for: notebook.id))
-        #expect(snapshots.count == 1)
+        let notebookID = await fixture.store.manifest.notebook.id
+        let snapshots = FileManager.default.directoryContents(at: layout.snapshotsDirectory(for: notebookID))
+        let snapshot = try #require(snapshots.first)
+        let manifest = try NotebookStore.readManifest(of: NotebookPackage(url: snapshot))
+        #expect(manifest.pages.first?.inkHash == InkEnvelope.hash(of: InkData.sample(seed: 2).payload))
     }
 }

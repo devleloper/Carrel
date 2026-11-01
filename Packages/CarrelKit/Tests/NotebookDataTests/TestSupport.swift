@@ -59,6 +59,18 @@ struct NotebookFixture {
         )
     }
 
+    var inkFileExists: Bool {
+        FileManager.default.fileExists(atPath: store.package.inkURL(for: pageID).path(percentEncoded: false))
+    }
+
+    /// Flips the last byte of the current ink file, which the envelope checksum detects.
+    func damageInk() throws {
+        let url = store.package.inkURL(for: pageID)
+        var data = try Data(contentsOf: url)
+        data[data.count - 1] ^= 0xFF
+        try data.write(to: url)
+    }
+
     func remove() {
         try? FileManager.default.removeItem(at: directory)
     }

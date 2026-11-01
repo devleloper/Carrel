@@ -14,8 +14,9 @@ public struct SnapshotStore: Sendable {
         self.layout = layout
     }
 
-    /// Takes a snapshot of a notebook whose pending changes are already on disk, then prunes old ones.
-    public func takeSnapshot(of notebookID: Notebook.ID, now: Date = .now) throws {
+    /// Snapshots a notebook through its store, so the copy includes changes still held in memory.
+    public func takeSnapshot(of store: NotebookStore, now: Date = .now) async throws {
+        let notebookID = await store.manifest.notebook.id
         let directory = layout.snapshotsDirectory(for: notebookID)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let destination = directory.appending(
@@ -25,7 +26,7 @@ public struct SnapshotStore: Sendable {
         guard !FileManager.default.fileExists(atPath: destination.path(percentEncoded: false)) else {
             return
         }
-        try FileManager.default.copyItem(at: layout.packageURL(for: notebookID), to: destination)
+        try await store.copyPackage(to: destination)
         Self.prune(directory, now: now)
     }
 

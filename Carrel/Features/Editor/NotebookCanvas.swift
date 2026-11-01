@@ -18,6 +18,7 @@ struct NotebookCanvas: UIViewControllerRepresentable {
         controller.apply(tool: palette.currentTool, isRulerActive: palette.isRulerActive)
         if let target = session.scrollTarget {
             controller.scroll(toPage: target)
+            // State must not change while SwiftUI is updating views, so the request is cleared right after.
             Task { session.scrollTarget = nil }
         }
     }

@@ -9,15 +9,6 @@ public struct SortKey: RawRepresentable, Hashable, Comparable, Codable, Sendable
         self.rawValue = rawValue
     }
 
-    public init(from decoder: any Decoder) throws {
-        rawValue = try decoder.singleValueContainer().decode(String.self)
-    }
-
-    public func encode(to encoder: any Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
-    }
-
     public static func < (lhs: SortKey, rhs: SortKey) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
@@ -63,18 +54,6 @@ public struct SortKey: RawRepresentable, Hashable, Comparable, Codable, Sendable
             position += 1
         }
         return SortKey(rawValue: String(result.map { alphabet[$0] }))
-    }
-
-    /// Returns `count` ascending keys between `lower` and `upper`.
-    public static func sequence(count: Int, between lower: SortKey? = nil, and upper: SortKey? = nil) -> [SortKey] {
-        var keys: [SortKey] = []
-        var previous = lower
-        for _ in 0..<count {
-            let key = between(previous, upper)
-            keys.append(key)
-            previous = key
-        }
-        return keys
     }
 
     private static let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyz")
