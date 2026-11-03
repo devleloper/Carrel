@@ -1,7 +1,451 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld" : {
 
+    },
+    "%lld notebooks can't be opened. Their files were kept unchanged." : {
+
+    },
+    "A damaged page could not be restored. Its files were kept." : {
+
+    },
+    "A damaged page was restored from its last saved version." : {
+
+    },
+    "A4" : {
+
+    },
+    "A4 Landscape" : {
+
+    },
+    "About" : {
+
+    },
+    "Add to Favorites" : {
+
+    },
+    "Back Up Now" : {
+
+    },
+    "Ballpoint" : {
+
+    },
+    "Black Leather" : {
+
+    },
+    "Blank" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Burgundy Cloth" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Carbon" : {
+
+    },
+    "Carrel" : {
+
+    },
+    "Carrel Backup %@" : {
+
+    },
+    "Carrel Can't Open Your Library" : {
+
+    },
+    "Charcoal Kraft" : {
+
+    },
+    "Cognac Leather" : {
+
+    },
+    "Cover" : {
+
+    },
+    "Cream" : {
+
+    },
+    "Create" : {
+
+    },
+    "Custom Color" : {
+
+    },
+    "Data" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete Folder" : {
+
+    },
+    "Delete Permanently" : {
+
+    },
+    "Deleted notebooks stay here for %lld days." : {
+
+    },
+    "Deleted pages are kept for %lld days." : {
+
+    },
+    "Done" : {
+
+    },
+    "Dots" : {
+
+    },
+    "Drawing with Finger" : {
+
+    },
+    "Duplicate" : {
+
+    },
+    "Edited" : {
+
+    },
+    "Eraser" : {
+
+    },
+    "Export PDF" : {
+
+    },
+    "Favorite" : {
+
+    },
+    "Favorites" : {
+
+    },
+    "Folder" : {
+
+    },
+    "Folders" : {
+
+    },
+    "Follows Settings › Apple Pencil › Only Draw with Apple Pencil. When fingers can draw, scroll with two fingers." : {
+
+    },
+    "Forest Cloth" : {
+
+    },
+    "Fountain" : {
+
+    },
+    "Graphite" : {
+
+    },
+    "Green" : {
+
+    },
+    "Grid" : {
+
+    },
+    "Highlighter" : {
+
+    },
+    "Ink" : {
+
+    },
+    "Ink Blue" : {
+
+    },
+    "Lasso" : {
+
+    },
+    "Last Backup" : {
+
+    },
+    "Lavender" : {
+
+    },
+    "Letter" : {
+
+    },
+    "Library" : {
+
+    },
+    "Linen" : {
+
+    },
+    "Mint" : {
+
+    },
+    "Mode" : {
+
+    },
+    "Monoline" : {
+
+    },
+    "More" : {
+
+    },
+    "Moss" : {
+
+    },
+    "Move Earlier" : {
+
+    },
+    "Move Later" : {
+
+    },
+    "Move to Folder" : {
+
+    },
+    "Move to Trash" : {
+
+    },
+    "Name" : {
+
+    },
+    "Narrow Ruled" : {
+
+    },
+    "Natural Kraft" : {
+
+    },
+    "Navy Cloth" : {
+
+    },
+    "Never" : {
+
+    },
+    "New Folder" : {
+
+    },
+    "New Notebook" : {
+
+    },
+    "Night" : {
+
+    },
+    "No Favorites" : {
+
+    },
+    "No Folder" : {
+
+    },
+    "No Notebooks" : {
+
+    },
+    "None" : {
+
+    },
+    "Not Saved" : {
+
+    },
+    "Notebook" : {
+
+    },
+    "Notebooks are stored on this iPad and saved as you write. A backup is a single file you can keep in Files or on another device." : {
+
+    },
+    "Off" : {
+
+    },
+    "OK" : {
+
+    },
+    "On" : {
+
+    },
+    "Oxblood Leather" : {
+
+    },
+    "Page %lld" : {
+
+    },
+    "Page %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Page %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Pages" : {
+
+    },
+    "Paper" : {
+
+    },
+    "Pen %lld" : {
+
+    },
+    "Pencil" : {
+
+    },
+    "Pink" : {
+
+    },
+    "Plum" : {
+
+    },
+    "Precise" : {
+
+    },
+    "Recently Deleted" : {
+
+    },
+    "Redo" : {
+
+    },
+    "Remove from Favorites" : {
+
+    },
+    "Rename" : {
+
+    },
+    "Rename Folder" : {
+
+    },
+    "Rename Notebook" : {
+
+    },
+    "Rename…" : {
+
+    },
+    "Restore" : {
+
+    },
+    "Restore from Backup?" : {
+
+    },
+    "Restore from Backup…" : {
+
+    },
+    "Ruled with Margin" : {
+
+    },
+    "Ruler" : {
+
+    },
+    "Sage Linen" : {
+
+    },
+    "Sand Linen" : {
+
+    },
+    "Saved" : {
+
+    },
+    "Saving…" : {
+
+    },
+    "Search Notebooks" : {
+
+    },
+    "Sepia" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Size" : {
+
+    },
+    "Sky" : {
+
+    },
+    "Slate Linen" : {
+
+    },
+    "Something Went Wrong" : {
+
+    },
+    "Source Code" : {
+
+    },
+    "Style" : {
+
+    },
+    "The ink of a page is missing. The page was left blank." : {
+
+    },
+    "There isn't enough free space on this iPad. Free up some space and try again." : {
+
+    },
+    "This file isn't a Carrel backup." : {
+
+    },
+    "This notebook couldn't be read. Its files were kept so it can be recovered." : {
+
+    },
+    "This Page" : {
+
+    },
+    "This page could not be read." : {
+
+    },
+    "This page was written with a newer version of iPadOS." : {
+
+    },
+    "This was saved by a newer version of Carrel. Update the app to open it." : {
+
+    },
+    "Title" : {
+
+    },
+    "Tone" : {
+
+    },
+    "Tone for All Pages" : {
+
+    },
+    "Touch and hold a notebook, then choose Add to Favorites." : {
+
+    },
+    "Tracking" : {
+
+    },
+    "Trash" : {
+
+    },
+    "Trash Is Empty" : {
+
+    },
+    "Undo" : {
+
+    },
+    "Untitled" : {
+
+    },
+    "Vermilion" : {
+
+    },
+    "Version" : {
+
+    },
+    "White" : {
+
+    },
+    "Whole Stroke" : {
+
+    },
+    "Wide Ruled" : {
+
+    },
+    "Width" : {
+
+    },
+    "Writing" : {
+
+    },
+    "Yellow" : {
+
+    },
+    "Your current library is replaced by the backup. It is kept in the recovery folder, not deleted." : {
+
+    },
+    "Your notebooks will live here, on this iPad." : {
+
+    }
   },
   "version" : "1.0"
 }
