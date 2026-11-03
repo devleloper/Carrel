@@ -13,6 +13,12 @@ enum UserFacingError {
             String(localized: "This was saved by a newer version of Carrel. Update the app to open it.")
         case NotebookStoreError.manifestUnreadable:
             String(localized: "This notebook couldn't be read. Its files were kept so it can be recovered.")
+        case NotebookStoreError.imageUnreadable:
+            String(localized: "This image couldn't be read. Try a different image.")
+        case NotebookStoreError.imageEncodingFailed:
+            String(localized: "This image couldn't be added to the notebook. Try again or choose another image.")
+        case NotebookStoreError.assetMissing:
+            String(localized: "The file of this image is missing from the notebook. Insert the image again.")
         default:
             error.localizedDescription
         }

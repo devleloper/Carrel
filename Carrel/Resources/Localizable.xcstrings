@@ -365,6 +365,9 @@
     "Style" : {
 
     },
+    "The file of this image is missing from the notebook. Insert the image again." : {
+
+    },
     "The ink of a page is missing. The page was left blank." : {
 
     },
@@ -372,6 +375,12 @@
 
     },
     "This file isn't a Carrel backup." : {
+
+    },
+    "This image couldn't be added to the notebook. Try again or choose another image." : {
+
+    },
+    "This image couldn't be read. Try a different image." : {
 
     },
     "This notebook couldn't be read. Its files were kept so it can be recovered." : {
