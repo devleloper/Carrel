@@ -33,6 +33,23 @@ struct ToolPaletteModelTests {
         #expect(palette.toolWithOpenSettings == nil)
     }
 
+    @Test func moreHoldsTheArtInksAsSelectableTools() throws {
+        let palette = ToolPaletteModel(defaults: defaults)
+        #expect(palette.moreTools == [.artInk(.watercolor), .artInk(.crayon)])
+
+        palette.choose(.artInk(.crayon))
+        palette.setColor(InkPalette.plum.hex, for: .artInk(.crayon))
+        palette.setWidth(.bold, for: .artInk(.crayon))
+
+        let crayon = try #require(palette.currentTool as? PKInkingTool)
+        #expect(crayon.inkType == .crayon)
+        #expect(crayon.width == StrokeWidth.bold.points(for: .crayon))
+        #expect(ToolPaletteModel(defaults: defaults).color(of: .artInk(.crayon)) == InkPalette.plum.hex)
+
+        palette.choose(.artInk(.crayon))
+        #expect(palette.toolWithOpenSettings == .artInk(.crayon))
+    }
+
     @Test func theLassoHasNoSettingsToOpen() {
         let palette = ToolPaletteModel(defaults: defaults)
 
@@ -100,6 +117,7 @@ struct ToolPaletteModelTests {
         #expect(settings.pens[1].width == .bold)
         #expect(settings.highlighter == InkSettings(colorHex: InkPalette.mint.hex, width: .fine))
         #expect(settings.eraser == ToolSettings.standard.eraser)
+        #expect(settings.watercolor == ToolSettings.standard.watercolor, "Saved before the art inks existed")
     }
 
     @Test func aPenWithoutAColorReturnsThePensToTheStandardPalette() throws {
@@ -190,7 +208,8 @@ struct StrokeWidthTests {
     }
 
     @Test func everyStepIsThickerAndInsideTheInksRange() {
-        let inkTypes = PenSettings.InkType.allCases.map(\.pencilKitType) + [.marker]
+        let inkTypes =
+            PenSettings.InkType.allCases.map(\.pencilKitType) + ArtInk.allCases.map(\.pencilKitType) + [.marker]
         for inkType in inkTypes {
             let points = StrokeWidth.allCases.map { $0.points(for: inkType) }
 

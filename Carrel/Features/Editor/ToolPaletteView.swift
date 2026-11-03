@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The vertical palette on the desk margin. Tapping the selected tool again opens its settings.
+/// The vertical palette on the desk margin: three favorite pens, highlighter, eraser, lasso and More. Tapping the
+/// selected tool again opens its settings.
 struct ToolPaletteView: View {
     @Bindable var palette: ToolPaletteModel
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -16,28 +17,91 @@ struct ToolPaletteView: View {
                 ToolButton(tool: tool, palette: palette) {
                     palette.choose(tool)
                 }
-                .popover(isPresented: settingsBinding(for: tool), arrowEdge: .trailing) {
-                    // A popover inherits the palette's capped text size; the settings scroll, so they take
-                    // the reader's full size.
-                    ToolSettingsView(palette: palette, tool: tool)
-                        .dynamicTypeSize(dynamicTypeSize)
-                }
+                .toolSettingsPopover(
+                    for: tool,
+                    palette: palette,
+                    arrowEdge: .trailing,
+                    dynamicTypeSize: dynamicTypeSize
+                )
             }
+            MoreToolsMenu(palette: palette, settingsArrowEdge: .trailing, settingsTypeSize: dynamicTypeSize)
         }
         .padding(Theme.Spacing.s)
         .glassEffect(.regular, in: .capsule)
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
     }
+}
 
-    private func settingsBinding(for tool: EditorTool) -> Binding<Bool> {
-        Binding(
-            get: { palette.toolWithOpenSettings == tool },
-            set: { isPresented in
-                if !isPresented {
-                    palette.dismissSettings()
+/// The art inks and the ruler. While an art ink is in hand the button shows it, so the palette always shows the
+/// current tool, and choosing that ink again opens its settings like any other tool.
+private struct MoreToolsMenu: View {
+    @Bindable var palette: ToolPaletteModel
+    let settingsArrowEdge: Edge
+    let settingsTypeSize: DynamicTypeSize
+    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 44
+
+    private var selectedArtInk: EditorTool? {
+        palette.moreTools.contains(palette.selection) ? palette.selection : nil
+    }
+
+    var body: some View {
+        Menu {
+            Section("Art Inks") {
+                ForEach(palette.moreTools, id: \.self) { tool in
+                    Toggle(isOn: Binding(get: { palette.selection == tool }, set: { _ in palette.choose(tool) })) {
+                        Label {
+                            Text(tool.title)
+                        } icon: {
+                            Image(systemName: tool.systemImage)
+                        }
+                    }
                 }
             }
+            Toggle("Ruler", systemImage: "ruler", isOn: $palette.isRulerActive)
+        } label: {
+            label
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("More Tools")
+        .accessibilityValue(Text(verbatim: accessibilityValue))
+        .accessibilityIdentifier("moreTools")
+        .toolSettingsPopover(
+            for: selectedArtInk,
+            palette: palette,
+            arrowEdge: settingsArrowEdge,
+            dynamicTypeSize: settingsTypeSize
         )
+    }
+
+    private var label: some View {
+        Group {
+            if let tool = selectedArtInk {
+                ToolIcon(tool: tool, palette: palette)
+            } else {
+                Image(systemName: "ellipsis")
+                    .foregroundStyle(Theme.primaryText)
+            }
+        }
+        .font(.title3)
+        .frame(width: size, height: size)
+        .background {
+            if selectedArtInk != nil {
+                SelectionDisc()
+            }
+        }
+        .contentShape(Circle())
+    }
+
+    private var accessibilityValue: String {
+        var parts: [String] = []
+        if let tool = selectedArtInk {
+            parts.append(String(localized: tool.title))
+            parts.append(palette.summary(of: tool))
+        }
+        if palette.isRulerActive {
+            parts.append(String(localized: "Ruler On"))
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -74,6 +138,38 @@ struct QuickPaletteView: View {
                     palette.setColor(swatch.hex, for: palette.selection)
                     onDone()
                 }
+            }
+        }
+    }
+}
+
+extension ToolPaletteModel {
+    /// Drives a settings popover: shown while `tool` has its settings open; dismissing it closes them.
+    fileprivate func isShowingSettings(for tool: EditorTool?) -> Binding<Bool> {
+        Binding(
+            get: { tool != nil && self.toolWithOpenSettings == tool },
+            set: { isPresented in
+                if !isPresented {
+                    self.dismissSettings()
+                }
+            }
+        )
+    }
+}
+
+extension View {
+    /// Shows the settings of `tool` while they are open. A popover inherits the palette's capped text size; the
+    /// settings scroll, so they get the reader's own size back.
+    fileprivate func toolSettingsPopover(
+        for tool: EditorTool?,
+        palette: ToolPaletteModel,
+        arrowEdge: Edge,
+        dynamicTypeSize: DynamicTypeSize
+    ) -> some View {
+        popover(isPresented: palette.isShowingSettings(for: tool), arrowEdge: arrowEdge) {
+            if let tool {
+                ToolSettingsView(palette: palette, tool: tool)
+                    .dynamicTypeSize(dynamicTypeSize)
             }
         }
     }

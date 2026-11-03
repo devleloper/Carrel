@@ -24,6 +24,9 @@ final class ToolPaletteModel {
         settings.pens.indices.map(EditorTool.pen) + [.highlighter, .eraser, .lasso]
     }
 
+    /// The tools behind More.
+    let moreTools = ArtInk.allCases.map(EditorTool.artInk)
+
     func pen(at index: Int) -> PenSettings? {
         settings.pens.indices.contains(index) ? settings.pens[index] : nil
     }
@@ -126,6 +129,9 @@ final class ToolPaletteModel {
             }
         case .lasso:
             return PKLassoTool()
+        case .artInk(let artInk):
+            let ink = settings[keyPath: ToolSettings.path(for: artInk)]
+            return inkingTool(artInk.pencilKitType, colorHex: ink.colorHex, width: ink.width)
         }
     }
 

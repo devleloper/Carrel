@@ -32,6 +32,8 @@ enum StrokeWidth: String, Codable, CaseIterable {
         case .fountainPen: steps = (2.5, 4, 7)
         case .pencil: steps = (2.4, 4, 7)
         case .marker: steps = (12, 20, 32)
+        case .watercolor: steps = (20, 40, 64)
+        case .crayon: steps = (16, 30, 46)
         default:
             let base = inkType.defaultWidth
             steps = (base * 0.6, base, base * 1.6)
@@ -115,6 +117,8 @@ struct EraserSettings: Codable, Hashable {
 struct ToolSettings: Codable, Hashable {
     var pens: [PenSettings]
     var highlighter: InkSettings
+    var watercolor: InkSettings
+    var crayon: InkSettings
     var eraser: EraserSettings
 
     static let standard = ToolSettings(
@@ -124,6 +128,8 @@ struct ToolSettings: Codable, Hashable {
             PenSettings(inkType: .pen, colorHex: InkPalette.vermilion.hex, width: .medium),
         ],
         highlighter: InkSettings(colorHex: InkPalette.yellow.hex, width: .medium),
+        watercolor: InkSettings(colorHex: InkPalette.sky.hex, width: .medium),
+        crayon: InkSettings(colorHex: InkPalette.vermilion.hex, width: .medium),
         eraser: EraserSettings(mode: .stroke, width: .medium)
     )
 
@@ -152,6 +158,7 @@ struct ToolSettings: Codable, Hashable {
         switch tool {
         case .pen(let index): pens.indices.contains(index) ? \.pens[index].colorHex : nil
         case .highlighter: \.highlighter.colorHex
+        case .artInk(let ink): Self.path(for: ink).appending(path: \.colorHex)
         case .eraser, .lasso: nil
         }
     }
@@ -161,8 +168,16 @@ struct ToolSettings: Codable, Hashable {
         switch tool {
         case .pen(let index): pens.indices.contains(index) ? \.pens[index].width : nil
         case .highlighter: \.highlighter.width
+        case .artInk(let ink): Self.path(for: ink).appending(path: \.width)
         case .eraser: \.eraser.width
         case .lasso: nil
+        }
+    }
+
+    static func path(for ink: ArtInk) -> WritableKeyPath<ToolSettings, InkSettings> {
+        switch ink {
+        case .watercolor: \.watercolor
+        case .crayon: \.crayon
         }
     }
 }
@@ -179,6 +194,8 @@ extension ToolSettings {
         self.init(
             pens: pens.count == Self.standard.pens.count ? pens : Self.standard.pens,
             highlighter: container.decode(.highlighter, or: Self.standard.highlighter),
+            watercolor: container.decode(.watercolor, or: Self.standard.watercolor),
+            crayon: container.decode(.crayon, or: Self.standard.crayon),
             eraser: container.decode(.eraser, or: Self.standard.eraser)
         )
     }

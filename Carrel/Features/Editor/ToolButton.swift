@@ -45,7 +45,7 @@ struct ToolIcon: View {
             symbol
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(ink, Theme.primaryText)
-        case .highlighter:
+        case .highlighter, .artInk:
             symbol.foregroundStyle(ink)
         case .eraser, .lasso:
             symbol.foregroundStyle(Theme.primaryText)
