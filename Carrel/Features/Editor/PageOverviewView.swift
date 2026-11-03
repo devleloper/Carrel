@@ -112,8 +112,13 @@ struct PageThumbnail: View {
             }
         }
         .aspectRatio(page.size.width / page.size.height, contentMode: .fit)
+        .overlay {
+            if let edge = page.paper.tone.edge {
+                Rectangle().strokeBorder(Color(uiColor: edge), lineWidth: 1)
+            }
+        }
         .shadow(color: Theme.pageShadow.opacity(Theme.Elevation.page), radius: 4, y: 2)
-        .task(id: page.inkHash) {
+        .task(id: page) {
             inkImage = await session.thumbnail(for: page, scale: CGFloat(160 / page.size.width) * displayScale)
         }
     }

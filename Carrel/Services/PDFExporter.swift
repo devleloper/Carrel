@@ -32,7 +32,7 @@ enum PDFExporter {
                 PaperRenderer.draw(content.page.paper, pageSize: size, in: bounds, context: context.cgContext)
                 if let drawing = content.drawing, !drawing.strokes.isEmpty {
                     // Ink is rasterized at three times the page resolution: sharp in print, small on disk.
-                    InkRenderer.image(of: drawing, pageSize: size, scale: 3).draw(in: bounds)
+                    InkRenderer.image(of: drawing, on: content.page, scale: 3).draw(in: bounds)
                 }
             }
         }

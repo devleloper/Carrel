@@ -13,4 +13,6 @@ enum Palette {
     /// Text printed on the paper labels of covers. Covers are objects on the desk and keep their colors in dark mode.
     static let coverLabelText = UIColor(hex: 0x2B241E)
     static let coverLabelPaper = UIColor(hex: 0xF6EEDC)
+    /// Night paper looks the same in either theme, and so does its edge.
+    static let nightPaperEdge = UIColor(white: 1, alpha: 0.08)
 }

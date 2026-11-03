@@ -29,13 +29,19 @@ final class PageView: UIView {
     var page: Page? {
         didSet {
             if oldValue?.paper != page?.paper || oldValue?.size != page?.size {
-                paperView.setNeedsDisplay()
+                paperDidChange()
             }
             updateOutline()
         }
     }
     /// Paper and size the next-page outline previews.
-    var outlinePaper = Paper.standard
+    var outlinePaper = Paper.standard {
+        didSet {
+            if page == nil, outlinePaper != oldValue {
+                paperDidChange()
+            }
+        }
+    }
     var outlineSize = PageSize.a4
     /// Whether the desk shows beside the page. A page that spans the window has no shadow: it would only fall on
     /// the strip of desk between pages and read as a border.
@@ -85,6 +91,7 @@ final class PageView: UIView {
         layer.shadowColor = Palette.pageShadow.cgColor
         layer.shadowRadius = 6
         layer.shadowOffset = CGSize(width: 0, height: 2)
+        overrideUserInterfaceStyle = paper.tone.inkAppearance
         updateOutline()
     }
 
@@ -114,7 +121,6 @@ final class PageView: UIView {
         self.canvas = canvas
         canvas.frame = bounds
         canvas.fit(pageSize, scale: scale)
-        canvas.overrideUserInterfaceStyle = paper.tone == .night ? .dark : .light
         addSubview(canvas)
         inkImageView.isHidden = true
     }
@@ -137,12 +143,29 @@ final class PageView: UIView {
         }
     }
 
+    /// The page, its canvas and its labels take the paper's appearance, so PencilKit shows ink converted for
+    /// dark paper and keeps it as written on light paper, whatever the app's theme.
+    private func paperDidChange() {
+        paperView.setNeedsDisplay()
+        let appearance = paper.tone.inkAppearance
+        guard appearance != overrideUserInterfaceStyle else {
+            return
+        }
+        overrideUserInterfaceStyle = appearance
+        // The cached image shows the ink in the other appearance. Only pages away from the visible area keep
+        // one, and the canvas they get when they come near renders the ink again.
+        releaseInkImage()
+    }
+
     /// The next-page outline is a dashed, faded page; the first stroke turns it into a real page without moving it.
     private func updateOutline() {
         let isOutline = page == nil && canvas?.pageID == nil
         outlineLayer.isHidden = !isOutline
         paperView.alpha = isOutline ? 0.45 : 1
         layer.shadowOpacity = isOutline || !showsEdges ? 0 : Float(Theme.Elevation.page)
+        let edge = isOutline ? nil : paper.tone.edge
+        layer.borderColor = edge?.cgColor
+        layer.borderWidth = edge == nil ? 0 : 1
     }
 
     func pageDidMaterialize() {

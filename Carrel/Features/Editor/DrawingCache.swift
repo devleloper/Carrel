@@ -21,6 +21,6 @@ final class DrawingCache {
         guard let drawing = drawings[page.id], !drawing.strokes.isEmpty else {
             return nil
         }
-        return InkRenderer.image(of: drawing, pageSize: page.size, scale: scale)
+        return InkRenderer.image(of: drawing, on: page, scale: scale)
     }
 }
