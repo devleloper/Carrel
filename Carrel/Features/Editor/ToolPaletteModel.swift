@@ -11,12 +11,28 @@ final class ToolPaletteModel {
     /// The tool whose settings are open. It is always the selected tool.
     private(set) var toolWithOpenSettings: EditorTool?
     var isRulerActive = false
+    var side: PaletteSide {
+        didSet { defaults.set(side.rawValue, forKey: Self.sideKey) }
+    }
+    var isCollapsed: Bool {
+        didSet {
+            defaults.set(isCollapsed, forKey: Self.collapsedKey)
+            if isCollapsed {
+                dismissSettings()
+            }
+        }
+    }
     @ObservationIgnored private var previousSelection: EditorTool = .pen(0)
     @ObservationIgnored private let defaults: UserDefaults
+
+    private static let sideKey = "toolPaletteSide"
+    private static let collapsedKey = "toolPaletteIsCollapsed"
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
         self.settings = ToolSettings.load(from: defaults)
+        self.side = defaults.string(forKey: Self.sideKey).flatMap(PaletteSide.init(rawValue:)) ?? .leading
+        self.isCollapsed = defaults.bool(forKey: Self.collapsedKey)
     }
 
     /// Every tool in palette order: the favorite pens, then highlighter, eraser and lasso.
@@ -43,7 +59,10 @@ final class ToolPaletteModel {
     }
 
     func dismissSettings() {
-        toolWithOpenSettings = nil
+        // Observation reports every assignment, and a drag of the palette calls this on each move.
+        if toolWithOpenSettings != nil {
+            toolWithOpenSettings = nil
+        }
     }
 
     func select(_ tool: EditorTool) {
@@ -137,5 +156,21 @@ final class ToolPaletteModel {
 
     private func inkingTool(_ inkType: PKInkingTool.InkType, colorHex: UInt32, width: StrokeWidth) -> PKInkingTool {
         PKInkingTool(inkType, color: UIColor(hex: colorHex), width: width.points(for: inkType))
+    }
+}
+
+/// The window edge the palette docks to. The palette at the pen tip opens toward the same side, so docking the
+/// palette on the right also moves that palette out from under a left hand.
+enum PaletteSide: String {
+    case leading
+    case trailing
+
+    /// The side for a palette dropped at `x` in a window `width` points wide: the nearer edge.
+    init(droppedAt x: CGFloat, width: CGFloat) {
+        self = x < width / 2 ? .leading : .trailing
+    }
+
+    var other: PaletteSide {
+        self == .leading ? .trailing : .leading
     }
 }

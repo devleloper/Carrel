@@ -15,18 +15,11 @@ final class LibraryFlowTests: XCTestCase {
     func testCreatingANotebookOpensItAndKeepsItInTheLibrary() throws {
         let app = XCUIApplication.launchedForUITesting()
 
-        app.buttons["newNotebook"].firstMatch.tap()
-        let titleField = app.textFields["notebookTitle"]
-        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
-        titleField.tap()
-        titleField.typeText("Linear Algebra")
-        app.buttons["createNotebook"].tap()
+        app.createNotebook(titled: "Linear Algebra")
 
-        let closeButton = app.buttons["closeEditor"]
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 10), "Creating a notebook should open it")
         XCTAssertTrue(app.staticTexts["saveStatus"].exists)
         try app.performAccessibilityAudit(for: Self.audits)
-        closeButton.tap()
+        app.buttons["closeEditor"].tap()
 
         XCTAssertTrue(app.buttons["Linear Algebra"].waitForExistence(timeout: 5))
         try app.performAccessibilityAudit(for: Self.audits)

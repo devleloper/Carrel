@@ -219,3 +219,48 @@ struct StrokeWidthTests {
         }
     }
 }
+
+@MainActor
+struct PaletteDockingTests {
+    private let defaults: UserDefaults
+
+    init() throws {
+        defaults = try #require(UserDefaults(suiteName: "PaletteDockingTests-\(UUID().uuidString)"))
+    }
+
+    @Test func thePaletteStartsExpandedOnTheLeadingEdge() {
+        let palette = ToolPaletteModel(defaults: defaults)
+
+        #expect(palette.side == .leading)
+        #expect(!palette.isCollapsed)
+    }
+
+    @Test func sideAndCollapsedStateAreThereAfterARelaunch() {
+        let palette = ToolPaletteModel(defaults: defaults)
+
+        palette.side = .trailing
+        palette.isCollapsed = true
+
+        let relaunched = ToolPaletteModel(defaults: defaults)
+        #expect(relaunched.side == .trailing)
+        #expect(relaunched.isCollapsed)
+    }
+
+    @Test func collapsingClosesOpenSettings() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.choose(.pen(0))
+        #expect(palette.toolWithOpenSettings == .pen(0))
+
+        palette.isCollapsed = true
+
+        #expect(palette.toolWithOpenSettings == nil)
+    }
+
+    @Test func aDroppedPaletteDocksToTheNearerEdge() {
+        #expect(PaletteSide(droppedAt: 120, width: 1000) == .leading)
+        #expect(PaletteSide(droppedAt: 499, width: 1000) == .leading)
+        #expect(PaletteSide(droppedAt: 500, width: 1000) == .trailing)
+        #expect(PaletteSide(droppedAt: 1200, width: 1000) == .trailing)
+        #expect(PaletteSide(droppedAt: -40, width: 1000) == .leading)
+    }
+}

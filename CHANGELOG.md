@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows
 - Tool settings with three widths for every tool, four ink types and a custom color for pens, and an eraser that
   removes whole strokes or erases pixels.
 - Watercolor and crayon inks under More in the palette, next to the ruler.
+- The palette collapses into a single button that shows the tool in hand, and docks to the left or right edge
+  of the window when dragged there. Tool settings open toward the page.
 - Apple Pencil Pro squeeze and double tap open a compact palette at the pen tip.
 - Autosave: at most five seconds of writing at risk if the app crashes, nothing when it goes to the background.
 - Recovery of damaged or missing pages from the previous version, with the damaged file kept aside.

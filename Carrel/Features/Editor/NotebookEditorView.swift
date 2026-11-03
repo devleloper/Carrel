@@ -28,6 +28,8 @@ struct NotebookEditorView: View {
             .ignoresSafeArea()
             .overlay { quickPalette }
         }
+        // Inside the top bar's safe area, so the palette centers on the page area and never runs under the bar.
+        .overlay { ToolPaletteView(palette: palette) }
         // A safe area bar, unlike an inset, drives the scroll edge effect of the scroll view beneath it, including
         // the canvas's UIKit one. The canvas ignores the safe area to reach under the bar, so it is told the bar's
         // height to keep the first page clear of it.
@@ -47,10 +49,6 @@ struct NotebookEditorView: View {
                 topBarHeight = frame.height
                 topBarBottom = frame.maxY
             }
-        }
-        .overlay(alignment: .leading) {
-            ToolPaletteView(palette: palette)
-                .padding(.leading, Theme.Spacing.l)
         }
         .overlay(alignment: .bottom) { recoveryBanner }
         .sheet(isPresented: $isShowingOverview) {

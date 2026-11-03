@@ -40,6 +40,7 @@ struct ToolSettingsView: View {
             .padding(Theme.Spacing.l)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .accessibilityIdentifier("toolSettings")
         .frame(idealWidth: 320)
         .presentationCompactAdaptation(.popover)
     }

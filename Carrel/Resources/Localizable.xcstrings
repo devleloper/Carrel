@@ -70,6 +70,9 @@
     "Cognac Leather" : {
 
     },
+    "Collapse Palette" : {
+
+    },
     "Color" : {
 
     },
@@ -128,6 +131,9 @@
 
     },
     "Eraser" : {
+
+    },
+    "Expand Palette" : {
 
     },
     "Export PDF" : {
@@ -221,6 +227,12 @@
 
     },
     "Move to Folder" : {
+
+    },
+    "Move to Left Edge" : {
+
+    },
+    "Move to Right Edge" : {
 
     },
     "Move to Trash" : {
