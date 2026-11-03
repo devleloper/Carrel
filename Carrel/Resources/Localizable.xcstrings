@@ -121,6 +121,9 @@
     "Favorites" : {
 
     },
+    "Fit Width" : {
+
+    },
     "Folder" : {
 
     },
@@ -453,6 +456,12 @@
 
     },
     "Your notebooks will live here, on this iPad." : {
+
+    },
+    "Zoom In" : {
+
+    },
+    "Zoom Out" : {
 
     }
   },

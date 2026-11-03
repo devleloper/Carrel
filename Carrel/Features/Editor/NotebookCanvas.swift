@@ -18,9 +18,13 @@ struct NotebookCanvas: UIViewControllerRepresentable {
         controller.topBarHeight = topBarHeight
         controller.show(session.pages)
         controller.apply(tool: palette.currentTool, isRulerActive: palette.isRulerActive)
+        // State must not change while SwiftUI is updating views, so each request is cleared right after.
+        if let command = session.zoomCommand {
+            controller.perform(command)
+            Task { session.zoomCommand = nil }
+        }
         if let target = session.scrollTarget {
             controller.scroll(toPage: target)
-            // State must not change while SwiftUI is updating views, so the request is cleared right after.
             Task { session.scrollTarget = nil }
         }
     }

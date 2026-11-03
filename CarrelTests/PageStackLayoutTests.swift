@@ -90,6 +90,16 @@ struct PageStackLayoutTests {
         #expect(PageStackLayout.zoomAfterDoubleTap(from: 3.4) == 1)
     }
 
+    @Test func zoomCommandsStepThroughTheZoomRange() {
+        #expect(PageStackLayout.zoom(after: .zoomIn, from: 1) == 1.5)
+        #expect(PageStackLayout.zoom(after: .zoomOut, from: 1) == 0.75)
+        #expect(PageStackLayout.zoom(after: .zoomIn, from: 1.7) == 2)
+        #expect(PageStackLayout.zoom(after: .zoomOut, from: 1.7) == 1.5)
+        #expect(PageStackLayout.zoom(after: .zoomIn, from: 4) == 4)
+        #expect(PageStackLayout.zoom(after: .zoomOut, from: 0.5) == 0.5)
+        #expect(PageStackLayout.zoom(after: .fitWidth, from: 3) == 1)
+    }
+
     @Test func anAnchorStaysOnTheSameSpotOfPaperAcrossZooms() throws {
         let sizes = Array(repeating: PageSize.a4, count: 3)
         let fit = PageStackLayout(pageSizes: sizes, containerWidth: 800, zoom: 1, metrics: metrics)

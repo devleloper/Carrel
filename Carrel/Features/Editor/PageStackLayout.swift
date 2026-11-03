@@ -17,9 +17,18 @@ struct PageStackLayout: Equatable {
         var point: CGPoint
     }
 
+    /// The View menu's zoom commands.
+    enum ZoomCommand: Equatable {
+        case zoomIn
+        case zoomOut
+        case fitWidth
+    }
+
     /// Zoom relative to the widest page fitting the container's width.
     static let zoomRange: ClosedRange<CGFloat> = 0.5...4
     static let doubleTapZoom: CGFloat = 2
+    /// Where Zoom In and Zoom Out stop.
+    static let zoomSteps: [CGFloat] = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 
     let pageFrames: [CGRect]
     let contentSize: CGSize
@@ -63,6 +72,15 @@ struct PageStackLayout: Equatable {
     /// Double tap goes to `doubleTapZoom` from fitting the width, and back to fitting the width from any other zoom.
     static func zoomAfterDoubleTap(from zoom: CGFloat) -> CGFloat {
         fitsWidth(zoom) ? doubleTapZoom : 1
+    }
+
+    /// Zoom In and Zoom Out go to the next step, so a zoom left between steps by a pinch rounds to one.
+    static func zoom(after command: ZoomCommand, from zoom: CGFloat) -> CGFloat {
+        switch command {
+        case .zoomIn: zoomSteps.first { $0 > zoom + 0.01 } ?? zoomRange.upperBound
+        case .zoomOut: zoomSteps.last { $0 < zoom - 0.01 } ?? zoomRange.lowerBound
+        case .fitWidth: 1
+        }
     }
 
     private static func fitsWidth(_ zoom: CGFloat) -> Bool {

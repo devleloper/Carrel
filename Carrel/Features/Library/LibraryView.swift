@@ -33,6 +33,8 @@ struct LibraryView: View {
             NotebookEditorView(session: session)
                 .navigationTransition(.zoom(sourceID: session.id, in: coverNamespace))
         }
+        // Set here rather than in the editor: values from a full-screen cover do not reach the menu bar's commands.
+        .focusedSceneValue(openSession)
         .sheet(isPresented: $isShowingSettings) {
             SettingsView()
         }

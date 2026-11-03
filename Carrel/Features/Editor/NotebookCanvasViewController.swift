@@ -107,9 +107,10 @@ final class NotebookCanvasViewController: UIViewController {
         scrollView.pinchGestureRecognizer?.allowedTouchTypes = Self.directTouchTypes
         scrollView.frame = view.bounds
         scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        scrollView.accessibilityIdentifier = "pages"
         view.addSubview(scrollView)
         scrollView.addSubview(documentView)
-        updateZoomLimits()
+        zoomDidChange()
     }
 
     // MARK: Updates from SwiftUI
@@ -162,6 +163,20 @@ final class NotebookCanvasViewController: UIViewController {
         }
     }
 
+    /// Zooms as the View menu asks, keeping the spot of paper at the centre of the screen in place.
+    func perform(_ command: PageStackLayout.ZoomCommand) {
+        let target = PageStackLayout.zoom(after: command, from: zoom)
+        guard target != zoom else {
+            return
+        }
+        let viewportCenter = CGPoint(x: scrollView.bounds.width / 2, y: scrollView.bounds.height / 2)
+        let centerInDocument = documentView.convert(
+            CGPoint(x: scrollView.bounds.midX, y: scrollView.bounds.midY),
+            from: scrollView
+        )
+        zoom(to: target, keeping: centerInDocument, at: viewportCenter)
+    }
+
     func scroll(toPage pageID: Page.ID) {
         guard let pageView = pageViews.first(where: { $0.page?.id == pageID }) else {
             return
@@ -208,9 +223,10 @@ final class NotebookCanvasViewController: UIViewController {
         updateLiveCanvases()
     }
 
-    private func updateZoomLimits() {
+    private func zoomDidChange() {
         scrollView.minimumZoomScale = PageStackLayout.zoomRange.lowerBound / zoom
         scrollView.maximumZoomScale = PageStackLayout.zoomRange.upperBound / zoom
+        scrollView.accessibilityValue = Double(zoom).formatted(.percent.precision(.fractionLength(0)))
     }
 
     /// Lays the pages out at `newZoom`, a sharp re-render instead of a scaled bitmap, and scrolls so that
@@ -218,7 +234,7 @@ final class NotebookCanvasViewController: UIViewController {
     private func setZoom(_ newZoom: CGFloat, keeping anchor: PageStackLayout.Anchor?, at viewportPoint: CGPoint) {
         zoom = PageStackLayout.restingZoom(after: newZoom)
         scrollView.zoomScale = 1
-        updateZoomLimits()
+        zoomDidChange()
         layoutPages()
         guard let anchor, let location = layout?.location(of: anchor) else {
             return
@@ -401,18 +417,25 @@ final class NotebookCanvasViewController: UIViewController {
     /// Switches between fitting the width and `PageStackLayout.doubleTapZoom`, keeping the tapped spot under the
     /// finger.
     @objc private func zoomTapped(_ tap: UITapGestureRecognizer) {
-        let target = PageStackLayout.zoomAfterDoubleTap(from: zoom)
-        let tapInDocument = tap.location(in: documentView)
-        let tapInViewport = tap.location(in: view)
+        zoom(
+            to: PageStackLayout.zoomAfterDoubleTap(from: zoom),
+            keeping: tap.location(in: documentView),
+            at: tap.location(in: view)
+        )
+    }
+
+    /// Zooms so that `documentPoint`, a point in the document, ends up at `viewportPoint`; animated unless Reduce
+    /// Motion is on.
+    private func zoom(to target: CGFloat, keeping documentPoint: CGPoint, at viewportPoint: CGPoint) {
         guard !UIAccessibility.isReduceMotionEnabled else {
-            setZoom(target, keeping: layout?.anchor(at: tapInDocument), at: tapInViewport)
+            setZoom(target, keeping: layout?.anchor(at: documentPoint), at: viewportPoint)
             return
         }
         // The animated zoom ends in scrollViewDidEndZooming, which lays the pages out sharply at the new zoom.
         let scale = target / zoom
         let visibleRect = CGRect(
-            x: tapInDocument.x - tapInViewport.x / scale,
-            y: tapInDocument.y - tapInViewport.y / scale,
+            x: documentPoint.x - viewportPoint.x / scale,
+            y: documentPoint.y - viewportPoint.y / scale,
             width: scrollView.bounds.width / scale,
             height: scrollView.bounds.height / scale
         )

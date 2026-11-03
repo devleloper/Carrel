@@ -19,5 +19,6 @@ struct CarrelApp: App {
                 }
             }
         }
+        .commands { EditorCommands() }
     }
 }

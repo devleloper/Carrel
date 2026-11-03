@@ -33,6 +33,8 @@ final class EditorSession: Identifiable {
     var currentPageIndex = 0
     /// Set by the page overview; the canvas scrolls there and clears it.
     var scrollTarget: Page.ID?
+    /// Set by the View menu; the canvas zooms and clears it.
+    var zoomCommand: PageStackLayout.ZoomCommand?
 
     private let store: NotebookStore
     private let drawings: DrawingCache
