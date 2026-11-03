@@ -25,7 +25,9 @@ There are no third-party dependencies, so the project builds right after cloning
 | Domain and storage tests (seconds, no simulator) | `swift test --package-path Packages/CarrelKit` |
 | App build, unit tests and UI tests on an iPad simulator | `Scripts/test.sh` |
 
-CI runs the same three commands on every push to `main`. Run `xcrun swift-format format --in-place --recursive
+CI runs the same checks on every push to `main`, on pull requests and on demand. It builds the package with
+warnings as errors before testing it (`swift build --build-tests --package-path Packages/CarrelKit -Xswiftc
+-warnings-as-errors`, then `swift test --skip-build`). Run `xcrun swift-format format --in-place --recursive
 Carrel CarrelTests CarrelUITests Packages/CarrelKit` before committing to fix formatting automatically.
 
 ## Where things live
@@ -56,11 +58,13 @@ Apple frameworks. The app target uses `MainActor` default isolation; the package
 - Commits go straight to `main`, which must stay green. Keep each commit small and self-contained.
 - Messages follow [Conventional Commits](https://www.conventionalcommits.org/):
   `feat(editor): open the palette at the pen tip on squeeze`.
-  Types: `feat`, `fix`, `perf`, `refactor`, `style`, `test`, `docs`, `build`, `ci`, `chore`.
+  Types: `feat`, `fix`, `perf`, `refactor`, `style`, `test`, `docs`, `build`, `ci`, `chore`, `revert`.
   Scopes: `app` (changes across the app target), `editor`, `library`, `settings`, `design`, `storage` (the
   package), `proposal` (the design documents in `docs/proposal`).
 - Occasional branches use `spike/<topic>`, `release/<version>` or `hotfix/<topic>`.
 - User-visible changes are added to the `Unreleased` section of [CHANGELOG.md](CHANGELOG.md) in the same commit.
+- A non-trivial decision, or a departure from the [proposal](docs/proposal/README.md), gets the next record in
+  [docs/adr](docs/adr), following [0001](docs/adr/0001-adopt-proposal-architecture.md).
 
 ## Definition of done
 
