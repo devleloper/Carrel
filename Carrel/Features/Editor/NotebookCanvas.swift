@@ -5,6 +5,7 @@ import SwiftUI
 struct NotebookCanvas: UIViewControllerRepresentable {
     let session: EditorSession
     let palette: ToolPaletteModel
+    let topBarHeight: CGFloat
     let onShowPalette: (CGPoint) -> Void
 
     func makeUIViewController(context: Context) -> NotebookCanvasViewController {
@@ -14,6 +15,7 @@ struct NotebookCanvas: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: NotebookCanvasViewController, context: Context) {
+        controller.topBarHeight = topBarHeight
         controller.show(session.pages)
         controller.apply(tool: palette.currentTool, isRulerActive: palette.isRulerActive)
         if let target = session.scrollTarget {

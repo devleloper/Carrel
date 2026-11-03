@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows
 - Notebooks that can't be opened are reported in the library; their files are left untouched.
 - Page overview with duplicate, reorder, delete and restore.
 - PDF export and a one-file library backup that can be restored from Settings.
+- Pages scroll under the editor's top bar, which softly fades them out beneath its controls.
 
 ### Fixed
 

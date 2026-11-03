@@ -10,6 +10,16 @@ import UIKit
 final class NotebookCanvasViewController: UIViewController {
     var onShowPalette: ((CGPoint) -> Void)?
 
+    /// Height of the editor's top bar below the system safe area. Pages scroll under the bar, so it is an inset of
+    /// the content rather than of the view.
+    var topBarHeight: CGFloat = 0 {
+        didSet {
+            if topBarHeight != oldValue {
+                updateTopInset()
+            }
+        }
+    }
+
     private let session: EditorSession
     private let palette: ToolPaletteModel
     private let scrollView = UIScrollView()
@@ -88,6 +98,9 @@ final class NotebookCanvasViewController: UIViewController {
         // Delaying touches would add latency to the first point of every stroke.
         scrollView.delaysContentTouches = false
         scrollView.contentInsetAdjustmentBehavior = .always
+        // Pages scroll under the top bar. The bar is a SwiftUI safe area bar, which registers itself with this
+        // scroll view's edge effect; the soft style fades handwriting out progressively under the bar's controls.
+        scrollView.topEdgeEffect.style = .soft
         scrollView.panGestureRecognizer.allowedTouchTypes = Self.directTouchTypes
         scrollView.pinchGestureRecognizer?.allowedTouchTypes = Self.directTouchTypes
         scrollView.frame = view.bounds
@@ -152,7 +165,10 @@ final class NotebookCanvasViewController: UIViewController {
             return
         }
         let frame = documentView.convert(pageView.frame, to: scrollView)
-        let target = CGPoint(x: scrollView.contentOffset.x, y: frame.minY - layoutMetrics.pageSpacing)
+        let target = CGPoint(
+            x: scrollView.contentOffset.x,
+            y: frame.minY - layoutMetrics.pageSpacing - scrollView.adjustedContentInset.top
+        )
         scrollView.setContentOffset(clampedOffset(target), animated: true)
     }
 
@@ -192,6 +208,17 @@ final class NotebookCanvasViewController: UIViewController {
     private func updateZoomLimits() {
         scrollView.minimumZoomScale = 1 / zoom
         scrollView.maximumZoomScale = maximumZoom / zoom
+    }
+
+    /// The bar's height arrives after the first layout; a notebook resting at its top stays there, so the first
+    /// page starts below the bar instead of under it.
+    private func updateTopInset() {
+        let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top
+        scrollView.contentInset.top = topBarHeight
+        scrollView.verticalScrollIndicatorInsets.top = topBarHeight
+        if wasAtTop {
+            scrollView.contentOffset.y = -scrollView.adjustedContentInset.top
+        }
     }
 
     private func clampedOffset(_ offset: CGPoint) -> CGPoint {

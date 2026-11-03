@@ -1,11 +1,12 @@
 import NotebookDomain
 import SwiftUI
 
-/// The editor: the page fills the window; glass controls float on the desk around it.
+/// The editor: pages fill the window and scroll under the top bar; glass controls float above them.
 struct NotebookEditorView: View {
     @Bindable var session: EditorSession
     @Environment(ToolPaletteModel.self) private var palette
     @State private var quickPaletteLocation: CGPoint?
+    @State private var topBarHeight: CGFloat = 0
     @State private var isShowingOverview = false
     @State private var exportedFile: SharedFile?
     @State private var isRenaming = false
@@ -16,7 +17,7 @@ struct NotebookEditorView: View {
     var body: some View {
         ZStack {
             Theme.desk.ignoresSafeArea()
-            NotebookCanvas(session: session, palette: palette) { location in
+            NotebookCanvas(session: session, palette: palette, topBarHeight: topBarHeight) { location in
                 withAnimation(Theme.Motion.morph) {
                     quickPaletteLocation = location
                 }
@@ -24,7 +25,10 @@ struct NotebookEditorView: View {
             .ignoresSafeArea()
             .overlay { quickPalette }
         }
-        .safeAreaInset(edge: .top) {
+        // A safe area bar, unlike an inset, drives the scroll edge effect of the scroll view beneath it, including
+        // the canvas's UIKit one. The canvas ignores the safe area to reach under the bar, so it is told the bar's
+        // height to keep the first page clear of it.
+        .safeAreaBar(edge: .top) {
             EditorTopBar(
                 session: session,
                 palette: palette,
@@ -36,6 +40,9 @@ struct NotebookEditorView: View {
                 },
                 onExport: { Task { await exportPDF() } }
             )
+            .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+                topBarHeight = height
+            }
         }
         .overlay(alignment: .leading) {
             ToolPaletteView(palette: palette)
