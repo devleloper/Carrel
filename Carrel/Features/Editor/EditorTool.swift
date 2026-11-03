@@ -34,6 +34,17 @@ enum EditorTool: Hashable {
         self != .lasso
     }
 
+    /// The colors the palette at the pen tip offers until the user has settled on colors of their own: distinct
+    /// inks for pens and art inks, the highlighter colors for the highlighter.
+    var starterColors: [UInt32] {
+        switch self {
+        case .pen, .artInk:
+            [InkPalette.carbon, InkPalette.inkBlue, InkPalette.vermilion, InkPalette.green, InkPalette.plum].map(\.hex)
+        case .highlighter: InkPalette.highlighters.map(\.hex)
+        case .eraser, .lasso: []
+        }
+    }
+
     /// The colors offered in the tool's settings; empty for tools that do not draw.
     var swatches: [InkPalette.Swatch] {
         switch self {

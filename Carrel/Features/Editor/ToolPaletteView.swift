@@ -29,6 +29,11 @@ struct ToolPaletteView: View {
                     expandedPalette
                 }
             }
+            .onGeometryChange(for: CGRect.self) {
+                $0.frame(in: .global)
+            } action: { frame in
+                palette.mainPaletteFrame = frame
+            }
             .offset(dragOffset)
             .opacity(isFadedOut ? 0 : 1)
             // A tap never moves far enough to start the drag, so the tools below keep their taps.
@@ -161,6 +166,7 @@ struct ToolPaletteView: View {
             }
             .onChanged { drag in
                 palette.dismissSettings()
+                palette.dismissPenTipPalette()
                 dragOffset = drag.translation
             }
             .onEnded { drag in
@@ -265,44 +271,6 @@ private struct MoreToolsMenu: View {
             parts.append(String(localized: "Ruler On"))
         }
         return parts.joined(separator: ", ")
-    }
-}
-
-/// The compact palette that opens at the pen tip after a Pencil Pro squeeze or double tap.
-struct QuickPaletteView: View {
-    @Bindable var palette: ToolPaletteModel
-    let onDone: () -> Void
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.s) {
-            HStack(spacing: Theme.Spacing.xs) {
-                ForEach(palette.tools, id: \.self) { tool in
-                    ToolButton(tool: tool, palette: palette) {
-                        palette.select(tool)
-                        onDone()
-                    }
-                }
-            }
-            if case .pen = palette.selection, let current = palette.color(of: palette.selection) {
-                quickColors(current: current)
-            }
-        }
-        .padding(Theme.Spacing.m)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
-    }
-
-    /// The first pen colors, one tap away while writing; all of them are in the pen's settings.
-    private static let quickColorCount = 6
-
-    private func quickColors(current: UInt32) -> some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            ForEach(InkPalette.pens.prefix(Self.quickColorCount)) { swatch in
-                SwatchButton(hex: swatch.hex, isSelected: swatch.hex == current) {
-                    palette.setColor(swatch.hex, for: palette.selection)
-                    onDone()
-                }
-            }
-        }
     }
 }
 

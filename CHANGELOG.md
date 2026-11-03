@@ -16,7 +16,11 @@ All notable changes to this project are documented here. The format follows
 - Watercolor and crayon inks under More in the palette, next to the ruler.
 - The palette collapses into a single button that shows the tool in hand, and docks to the left or right edge
   of the window when dragged there. Tool settings open toward the page.
-- Apple Pencil Pro squeeze and double tap open a compact palette at the pen tip.
+- Apple Pencil Pro squeeze and double tap open a compact palette at the pen tip: the six tools above five colors
+  of the tool in hand, led by the ones it used last. It grows out of the tip above and beside it, away from the
+  writing hand and toward the side the palette is docked on, stays clear of the top bar and the palette, and
+  closes with a choice, a touch elsewhere or a second squeeze. A squeeze or double tap set to switch to the
+  eraser or the previous tool in Settings does that instead.
 - Autosave: at most five seconds of writing at risk if the app crashes, nothing when it goes to the background.
 - Recovery of damaged or missing pages from the previous version, with the damaged file kept aside.
 - The editor closes only once everything is saved, and shows why when a save fails.

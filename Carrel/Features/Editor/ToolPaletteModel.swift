@@ -11,12 +11,21 @@ final class ToolPaletteModel {
     /// The tool whose settings are open. It is always the selected tool.
     private(set) var toolWithOpenSettings: EditorTool?
     var isRulerActive = false
+    /// Where the palette at the pen tip is open; `nil` while it is closed.
+    private(set) var penTipPaletteAnchor: PenTipPaletteAnchor?
+    /// The main palette's frame in global coordinates, which the palette at the pen tip keeps clear of. It is
+    /// layout, not a setting, so it is not saved.
+    var mainPaletteFrame: CGRect?
     var side: PaletteSide {
-        didSet { defaults.set(side.rawValue, forKey: Self.sideKey) }
+        didSet {
+            defaults.set(side.rawValue, forKey: Self.sideKey)
+            dismissPenTipPalette()
+        }
     }
     var isCollapsed: Bool {
         didSet {
             defaults.set(isCollapsed, forKey: Self.collapsedKey)
+            dismissPenTipPalette()
             if isCollapsed {
                 dismissSettings()
             }
@@ -49,19 +58,36 @@ final class ToolPaletteModel {
 
     // MARK: Selection
 
-    /// The palette's one gesture: a tap selects a tool, and a tap on the selected tool opens its settings.
+    /// The palette's one gesture: a tap selects a tool, and a tap on the selected tool opens its settings. The
+    /// palette at the pen tip closes, since it would show the tool it opened for.
     func choose(_ tool: EditorTool) {
+        dismissPenTipPalette()
         if tool == selection {
-            toolWithOpenSettings = tool.hasSettings ? tool : nil
+            guard tool.hasSettings else {
+                return
+            }
+            // The color in hand is about to change, and it should stay one tap away at the pen tip.
+            rememberColor(of: tool)
+            toolWithOpenSettings = tool
         } else {
             select(tool)
         }
     }
 
+    /// Closing the settings of a tool settles its color, so it joins the tool's recent colors. Remembering every
+    /// change instead would fill them with the steps of a drag through the color picker.
     func dismissSettings() {
         // Observation reports every assignment, and a drag of the palette calls this on each move.
-        if toolWithOpenSettings != nil {
-            toolWithOpenSettings = nil
+        guard let tool = toolWithOpenSettings else {
+            return
+        }
+        rememberColor(of: tool)
+        toolWithOpenSettings = nil
+    }
+
+    private func rememberColor(of tool: EditorTool) {
+        if let hex = color(of: tool) {
+            settings.rememberColor(hex, for: tool)
         }
     }
 
@@ -69,9 +95,9 @@ final class ToolPaletteModel {
         guard tool != selection else {
             return
         }
+        dismissSettings()
         previousSelection = selection
         selection = tool
-        toolWithOpenSettings = nil
     }
 
     func selectPrevious() {
@@ -84,6 +110,61 @@ final class ToolPaletteModel {
         } else {
             select(.eraser)
         }
+    }
+
+    // MARK: Palette at the pen tip
+
+    var isPenTipPaletteOpen: Bool {
+        penTipPaletteAnchor != nil
+    }
+
+    /// Opens the palette at `location`, the pen tip in the editor's coordinates, or beside the main palette when
+    /// there is no tip to open at.
+    func showPenTipPalette(at location: CGPoint?) {
+        dismissSettings()
+        penTipPaletteAnchor = location.map(PenTipPaletteAnchor.penTip) ?? .mainPalette
+    }
+
+    /// The pencil gesture that opens the palette also closes it.
+    func togglePenTipPalette(at location: CGPoint?) {
+        if isPenTipPaletteOpen {
+            dismissPenTipPalette()
+        } else {
+            showPenTipPalette(at: location)
+        }
+    }
+
+    func dismissPenTipPalette() {
+        if penTipPaletteAnchor != nil {
+            penTipPaletteAnchor = nil
+        }
+    }
+
+    /// The second row of the palette at the pen tip: the tool's current color, then the colors settled on for it
+    /// lately, filled up to five from its starter colors. Tools without a color have none.
+    var quickColors: [UInt32] {
+        guard let current = color(of: selection), let path = settings.recentColorsPath(for: selection) else {
+            return []
+        }
+        var colors: [UInt32] = []
+        for hex in [current] + settings[keyPath: path] + selection.starterColors where !colors.contains(hex) {
+            colors.append(hex)
+        }
+        return Array(colors.prefix(ToolSettings.recentColorLimit))
+    }
+
+    /// A choice at the pen tip is final, so the palette closes with it.
+    func selectAtPenTip(_ tool: EditorTool) {
+        select(tool)
+        dismissPenTipPalette()
+    }
+
+    /// The color the tool had stays among its recent colors, so switching back is one tap.
+    func applyQuickColor(_ hex: UInt32) {
+        rememberColor(of: selection)
+        setColor(hex, for: selection)
+        settings.rememberColor(hex, for: selection)
+        dismissPenTipPalette()
     }
 
     // MARK: Tool settings
@@ -159,9 +240,18 @@ final class ToolPaletteModel {
     }
 }
 
+/// Where the palette at the pen tip opens. Nonisolated because the layout that places the palette reads it
+/// outside the main actor.
+nonisolated enum PenTipPaletteAnchor: Equatable {
+    /// At the pen tip, in the editor's coordinates.
+    case penTip(CGPoint)
+    /// Beside the main palette, when the pencil is away from the screen and nothing has been written yet.
+    case mainPalette
+}
+
 /// The window edge the palette docks to. The palette at the pen tip opens toward the same side, so docking the
 /// palette on the right also moves that palette out from under a left hand.
-enum PaletteSide: String {
+nonisolated enum PaletteSide: String {
     case leading
     case trailing
 

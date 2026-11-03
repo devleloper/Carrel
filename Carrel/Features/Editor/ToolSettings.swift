@@ -61,6 +61,8 @@ struct PenSettings: Codable, Hashable {
     var inkType: InkType
     var colorHex: UInt32
     var width: StrokeWidth
+    /// Colors the user settled on lately for this pen, newest first, for the palette at the pen tip.
+    var recentColors: [UInt32] = []
 
     enum InkType: String, Codable, CaseIterable {
         case pen
@@ -92,6 +94,8 @@ struct PenSettings: Codable, Hashable {
 struct InkSettings: Codable, Hashable {
     var colorHex: UInt32
     var width: StrokeWidth
+    /// Colors the user settled on lately for this tool, newest first, for the palette at the pen tip.
+    var recentColors: [UInt32] = []
 }
 
 struct EraserSettings: Codable, Hashable {
@@ -132,6 +136,19 @@ struct ToolSettings: Codable, Hashable {
         crayon: InkSettings(colorHex: InkPalette.vermilion.hex, width: .medium),
         eraser: EraserSettings(mode: .stroke, width: .medium)
     )
+
+    static let recentColorLimit = 5
+
+    /// Puts `hex` first among the recent colors of `tool`, which keeps the newest five.
+    mutating func rememberColor(_ hex: UInt32, for tool: EditorTool) {
+        guard let path = recentColorsPath(for: tool) else {
+            return
+        }
+        var colors = self[keyPath: path]
+        colors.removeAll { $0 == hex }
+        colors.insert(hex, at: 0)
+        self[keyPath: path] = Array(colors.prefix(Self.recentColorLimit))
+    }
 
     private static let defaultsKey = "toolSettings"
 
@@ -174,6 +191,16 @@ struct ToolSettings: Codable, Hashable {
         }
     }
 
+    /// Where a tool keeps its recent colors, or `nil` for tools without a color.
+    func recentColorsPath(for tool: EditorTool) -> WritableKeyPath<ToolSettings, [UInt32]>? {
+        switch tool {
+        case .pen(let index): pens.indices.contains(index) ? \.pens[index].recentColors : nil
+        case .highlighter: \.highlighter.recentColors
+        case .artInk(let ink): Self.path(for: ink).appending(path: \.recentColors)
+        case .eraser, .lasso: nil
+        }
+    }
+
     static func path(for ink: ArtInk) -> WritableKeyPath<ToolSettings, InkSettings> {
         switch ink {
         case .watercolor: \.watercolor
@@ -208,7 +235,8 @@ extension PenSettings {
         self.init(
             inkType: container.decode(.inkType, or: .fountainPen),
             colorHex: try container.decode(UInt32.self, forKey: .colorHex),
-            width: container.decode(.width, or: .medium)
+            width: container.decode(.width, or: .medium),
+            recentColors: container.decode(.recentColors, or: [])
         )
     }
 }
@@ -218,7 +246,8 @@ extension InkSettings {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             colorHex: try container.decode(UInt32.self, forKey: .colorHex),
-            width: container.decode(.width, or: .medium)
+            width: container.decode(.width, or: .medium),
+            recentColors: container.decode(.recentColors, or: [])
         )
     }
 }

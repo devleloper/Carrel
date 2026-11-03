@@ -1,5 +1,6 @@
 import Foundation
 import PencilKit
+import SwiftUI
 import Testing
 
 @testable import Carrel
@@ -262,5 +263,228 @@ struct PaletteDockingTests {
         #expect(PaletteSide(droppedAt: 500, width: 1000) == .trailing)
         #expect(PaletteSide(droppedAt: 1200, width: 1000) == .trailing)
         #expect(PaletteSide(droppedAt: -40, width: 1000) == .leading)
+    }
+}
+
+@MainActor
+struct PenTipPaletteTests {
+    private let defaults: UserDefaults
+    private let tip = CGPoint(x: 300, y: 400)
+
+    init() throws {
+        defaults = try #require(UserDefaults(suiteName: "PenTipPaletteTests-\(UUID().uuidString)"))
+    }
+
+    @Test func aColorChangedInTheSettingsJoinsThatPensRecentColorsWithTheOneBefore() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.select(.pen(1))
+        palette.choose(.pen(1))
+
+        palette.setColor(InkPalette.sky.hex, for: .pen(1))
+        palette.setColor(InkPalette.sepia.hex, for: .pen(1))
+        palette.dismissSettings()
+
+        #expect(palette.settings.pens[1].recentColors == [InkPalette.sepia.hex, InkPalette.inkBlue.hex])
+        #expect(palette.settings.pens[0].recentColors.isEmpty, "Each pen keeps its own colors")
+        #expect(ToolPaletteModel(defaults: defaults).settings.pens[1].recentColors.first == InkPalette.sepia.hex)
+    }
+
+    @Test func recentColorsHaveNoDuplicatesAndKeepTheNewestFive() {
+        var settings = ToolSettings.standard
+
+        for swatch in InkPalette.pens {
+            settings.rememberColor(swatch.hex, for: .pen(0))
+        }
+        settings.rememberColor(InkPalette.moss.hex, for: .pen(0))
+
+        let colors = settings.pens[0].recentColors
+        #expect(colors.count == ToolSettings.recentColorLimit)
+        #expect(colors.first == InkPalette.moss.hex)
+        #expect(Set(colors).count == colors.count)
+        #expect(colors.last == InkPalette.plum.hex)
+    }
+
+    @Test func theColorRowShowsTheColorsOfTheToolInHand() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        let starters = [InkPalette.carbon, InkPalette.inkBlue, InkPalette.vermilion, InkPalette.green, InkPalette.plum]
+
+        #expect(palette.quickColors == starters.map(\.hex))
+
+        palette.select(.pen(1))
+        #expect(palette.quickColors.first == InkPalette.inkBlue.hex)
+        #expect(palette.quickColors.count == 5)
+
+        palette.select(.artInk(.watercolor))
+        #expect(palette.quickColors.first == InkPalette.sky.hex)
+
+        palette.select(.highlighter)
+        #expect(palette.quickColors == InkPalette.highlighters.map(\.hex))
+
+        palette.select(.lasso)
+        #expect(palette.quickColors.isEmpty)
+    }
+
+    @Test func aQuickColorRecolorsTheToolInHandAndClosesThePalette() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.select(.pen(1))
+        palette.showPenTipPalette(at: tip)
+
+        palette.applyQuickColor(InkPalette.green.hex)
+
+        #expect(palette.color(of: .pen(1)) == InkPalette.green.hex)
+        #expect(palette.quickColors.prefix(2) == [InkPalette.green.hex, InkPalette.inkBlue.hex])
+        #expect(!palette.isPenTipPaletteOpen)
+    }
+
+    @Test func aHighlighterColorStaysWithTheHighlighter() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.select(.highlighter)
+        palette.choose(.highlighter)
+
+        palette.setColor(0xC0FFEE, for: .highlighter)
+        palette.dismissSettings()
+
+        #expect(palette.quickColors == [0xC0FFEE] + InkPalette.highlighters.map(\.hex))
+        #expect(palette.settings.pens.allSatisfy { $0.recentColors.isEmpty })
+    }
+
+    @Test func choosingAToolAtThePenTipSelectsItAndClosesThePalette() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.showPenTipPalette(at: tip)
+        #expect(palette.penTipPaletteAnchor == .penTip(tip))
+
+        palette.selectAtPenTip(.highlighter)
+
+        #expect(palette.selection == .highlighter)
+        #expect(palette.toolWithOpenSettings == nil)
+        #expect(!palette.isPenTipPaletteOpen)
+    }
+
+    @Test func theGestureThatOpensThePaletteClosesItAgain() {
+        let palette = ToolPaletteModel(defaults: defaults)
+
+        palette.togglePenTipPalette(at: tip)
+        #expect(palette.penTipPaletteAnchor == .penTip(tip))
+
+        palette.togglePenTipPalette(at: CGPoint(x: 10, y: 10))
+        #expect(!palette.isPenTipPaletteOpen)
+    }
+
+    @Test func withoutATipThePaletteOpensBesideTheMainPalette() {
+        let palette = ToolPaletteModel(defaults: defaults)
+
+        palette.togglePenTipPalette(at: nil)
+
+        #expect(palette.penTipPaletteAnchor == .mainPalette)
+    }
+
+    @Test func openingThePaletteClosesOpenSettingsAndKeepsTheirColor() {
+        let palette = ToolPaletteModel(defaults: defaults)
+        palette.choose(.pen(0))
+        palette.setColor(InkPalette.plum.hex, for: .pen(0))
+
+        palette.showPenTipPalette(at: tip)
+
+        #expect(palette.toolWithOpenSettings == nil)
+        #expect(palette.settings.pens[0].recentColors.first == InkPalette.plum.hex)
+    }
+
+    @Test func usingTheMainPaletteClosesThePaletteAtThePenTip() {
+        let palette = ToolPaletteModel(defaults: defaults)
+
+        palette.showPenTipPalette(at: tip)
+        palette.choose(.highlighter)
+        #expect(!palette.isPenTipPaletteOpen, "A choice in the main palette")
+
+        palette.showPenTipPalette(at: tip)
+        palette.isCollapsed = true
+        #expect(!palette.isPenTipPaletteOpen, "Collapsing the main palette")
+
+        palette.showPenTipPalette(at: tip)
+        palette.side = .trailing
+        #expect(!palette.isPenTipPaletteOpen, "Docking the main palette")
+    }
+}
+
+@MainActor
+struct PenTipPalettePlacementTests {
+    private let window = CGRect(x: 0, y: 0, width: 1000, height: 800)
+    private let size = CGSize(width: 300, height: 100)
+
+    private func frame(
+        tip: CGPoint,
+        side: PaletteSide = .leading,
+        in bounds: CGRect? = nil,
+        topInset: CGFloat = 0,
+        mainPalette: CGRect? = nil
+    ) -> CGRect {
+        placement(.penTip(tip), side: side, in: bounds, topInset: topInset, mainPalette: mainPalette).frame(of: size)
+    }
+
+    private func placement(
+        _ anchor: PenTipPaletteAnchor,
+        side: PaletteSide = .leading,
+        in bounds: CGRect? = nil,
+        topInset: CGFloat = 0,
+        mainPalette: CGRect? = nil
+    ) -> PenTipPalettePlacement {
+        let area = PenTipPalettePlacement.freeArea(
+            in: bounds ?? window,
+            safeAreaInsets: EdgeInsets(top: topInset, leading: 0, bottom: 0, trailing: 0),
+            mainPalette: mainPalette
+        )
+        return PenTipPalettePlacement(anchor: anchor, side: side, mainPalette: mainPalette, area: area)
+    }
+
+    @Test func thePaletteOpensAboveTheTipAndTowardThePalettesSide() {
+        let tip = CGPoint(x: 500, y: 400)
+
+        #expect(frame(tip: tip, side: .leading) == CGRect(x: 176, y: 276, width: 300, height: 100))
+        #expect(frame(tip: tip, side: .trailing) == CGRect(x: 524, y: 276, width: 300, height: 100))
+    }
+
+    @Test func withoutRoomAboveThePaletteOpensBelowTheTip() {
+        #expect(frame(tip: CGPoint(x: 500, y: 60)).minY == 84)
+    }
+
+    @Test func thePaletteStaysBelowTheTopBar() {
+        let belowTheBar = frame(tip: CGPoint(x: 500, y: 150), topInset: 84)
+
+        #expect(belowTheBar.minY == 174, "Above the tip it would reach under the bar, so it opens below")
+    }
+
+    @Test func withoutRoomOnItsSideThePaletteOpensOnTheOtherSide() {
+        #expect(frame(tip: CGPoint(x: 120, y: 400), side: .leading).minX == 144)
+        #expect(frame(tip: CGPoint(x: 900, y: 400), side: .trailing).maxX == 876)
+    }
+
+    @Test func thePaletteKeepsClearOfTheMainPalette() {
+        let leadingPalette = CGRect(x: 16, y: 300, width: 60, height: 400)
+        #expect(frame(tip: CGPoint(x: 380, y: 400), side: .leading, mainPalette: leadingPalette).minX == 404)
+
+        let trailingPalette = CGRect(x: 924, y: 300, width: 60, height: 400)
+        let besideTrailing = frame(tip: CGPoint(x: 590, y: 400), side: .trailing, mainPalette: trailingPalette)
+        #expect(besideTrailing.maxX == 566, "It would reach to 914, past the palette's margin at 908")
+    }
+
+    @Test func withoutATipThePaletteOpensBesideTheMainPalette() {
+        let mainPalette = CGRect(x: 16, y: 200, width: 60, height: 400)
+        let beside = placement(.mainPalette, mainPalette: mainPalette)
+
+        #expect(beside.frame(of: size) == CGRect(x: 92, y: 350, width: 300, height: 100))
+        #expect(beside.origin == CGPoint(x: 76, y: 400), "It grows out of the main palette's inner edge")
+
+        let unmeasured = placement(.mainPalette).frame(of: size)
+        #expect(unmeasured.midX == window.midX)
+        #expect(unmeasured.midY == window.midY)
+    }
+
+    @Test func thePaletteStaysInsideTheWindowMargins() {
+        let narrow = CGRect(x: 0, y: 0, width: 360, height: 800)
+
+        let placed = frame(tip: CGPoint(x: 180, y: 400), in: narrow)
+
+        #expect(placed.minX >= PenTipPalettePlacement.margin)
+        #expect(placed.maxX <= narrow.maxX - PenTipPalettePlacement.margin)
     }
 }

@@ -5,11 +5,7 @@ import SwiftUI
 struct NotebookEditorView: View {
     @Bindable var session: EditorSession
     @Environment(ToolPaletteModel.self) private var palette
-    @State private var quickPaletteLocation: CGPoint?
     @State private var topBarHeight: CGFloat = 0
-    /// The bar's lower edge in the window, which is also the canvas's coordinate space: the canvas fills the window.
-    @State private var topBarBottom: CGFloat = 0
-    @State private var quickPaletteHeight: CGFloat = 0
     @State private var isShowingOverview = false
     @State private var exportedFile: SharedFile?
     @State private var isRenaming = false
@@ -20,13 +16,15 @@ struct NotebookEditorView: View {
     var body: some View {
         ZStack {
             Theme.desk.ignoresSafeArea()
-            NotebookCanvas(session: session, palette: palette, topBarHeight: topBarHeight) { location in
-                withAnimation(Theme.Motion.morph) {
-                    quickPaletteLocation = location
-                }
-            }
+            // The pencil gesture that opens the palette at the pen tip also closes it.
+            NotebookCanvas(
+                session: session,
+                palette: palette,
+                topBarHeight: topBarHeight,
+                onShowPalette: palette.togglePenTipPalette(at:)
+            )
             .ignoresSafeArea()
-            .overlay { quickPalette }
+            .overlay { PenTipPaletteLayer(palette: palette) }
         }
         // Inside the top bar's safe area, so the palette centers on the page area and never runs under the bar.
         .overlay { ToolPaletteView(palette: palette) }
@@ -45,9 +43,8 @@ struct NotebookEditorView: View {
                 },
                 onExport: { Task { await exportPDF() } }
             )
-            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { frame in
-                topBarHeight = frame.height
-                topBarBottom = frame.maxY
+            .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+                topBarHeight = height
             }
         }
         .overlay(alignment: .bottom) { recoveryBanner }
@@ -97,34 +94,6 @@ struct NotebookEditorView: View {
             exportedFile = SharedFile(url: try await session.exportPDF())
         } catch {
             session.errorMessage = UserFacingError.message(for: error)
-        }
-    }
-
-    @ViewBuilder
-    private var quickPalette: some View {
-        if let location = quickPaletteLocation {
-            ZStack {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { quickPaletteLocation = nil }
-                QuickPaletteView(palette: palette) {
-                    withAnimation(Theme.Motion.chrome) {
-                        quickPaletteLocation = nil
-                    }
-                }
-                .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
-                    quickPaletteHeight = height
-                }
-                // Kept below the top bar, which lies above this overlay and would take every touch on the palette.
-                .position(
-                    x: location.x,
-                    y: max(location.y - 80, topBarBottom + quickPaletteHeight / 2 + Theme.Spacing.s)
-                )
-                .transition(.scale(scale: 0.85).combined(with: .opacity))
-            }
-            // The location is in the canvas's coordinates, which span the window; inside the safe area the palette
-            // would open the height of the status bar and the top bar below the pen tip.
-            .ignoresSafeArea()
         }
     }
 

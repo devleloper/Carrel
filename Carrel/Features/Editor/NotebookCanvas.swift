@@ -6,7 +6,7 @@ struct NotebookCanvas: UIViewControllerRepresentable {
     let session: EditorSession
     let palette: ToolPaletteModel
     let topBarHeight: CGFloat
-    let onShowPalette: (CGPoint) -> Void
+    let onShowPalette: (CGPoint?) -> Void
 
     func makeUIViewController(context: Context) -> NotebookCanvasViewController {
         let controller = NotebookCanvasViewController(session: session, palette: palette)

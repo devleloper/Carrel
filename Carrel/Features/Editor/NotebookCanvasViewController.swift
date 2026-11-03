@@ -8,7 +8,7 @@ import UIKit
 /// A canvas belongs to one page for its whole life and is discarded when the page scrolls away, so undo can
 /// never apply one page's history to another.
 final class NotebookCanvasViewController: UIViewController {
-    var onShowPalette: ((CGPoint) -> Void)?
+    var onShowPalette: ((CGPoint?) -> Void)?
 
     /// Height of the editor's top bar below the system safe area. Pages scroll under the bar, so it is an inset of
     /// the content rather than of the view.
@@ -388,9 +388,9 @@ final class NotebookCanvasViewController: UIViewController {
     }
 
     /// Without a hover position (the pencil is away from the screen) the palette opens where writing stopped.
+    /// Before the first stroke there is no such point, and the palette opens beside the main palette.
     private func showPalette(near hoverLocation: CGPoint?) {
-        let fallback = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        onShowPalette?(hoverLocation ?? lastStrokePoint ?? fallback)
+        onShowPalette?(hoverLocation ?? lastStrokePoint)
     }
 
     // MARK: Input
