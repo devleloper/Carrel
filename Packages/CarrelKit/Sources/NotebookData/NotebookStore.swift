@@ -96,7 +96,7 @@ public actor NotebookStore {
             return try VersionedFile.read(
                 NotebookManifest.self,
                 from: [package.manifestURL, package.previousManifestURL],
-                supportedSchemaVersion: NotebookManifest.currentSchemaVersion,
+                migration: NotebookManifest.migration,
                 movingDamagedTo: recoveredDirectory
             )
         } catch VersionedFileError.newerSchema {

@@ -16,7 +16,7 @@ struct VersionedFileTests {
         let manifest = try VersionedFile.read(
             LibraryManifest.self,
             from: [current, previous],
-            supportedSchemaVersion: LibraryManifest.currentSchemaVersion
+            migration: LibraryManifest.migration
         )
 
         #expect(manifest == LibraryManifest())
@@ -34,7 +34,27 @@ struct VersionedFileTests {
             try VersionedFile.read(
                 LibraryManifest.self,
                 from: [current, previous],
-                supportedSchemaVersion: LibraryManifest.currentSchemaVersion
+                migration: LibraryManifest.migration
+            )
+        }
+    }
+
+    @Test func anOlderSchemaIsMigratedBeforeDecoding() throws {
+        let migration = SchemaMigration(steps: [{ $0["tags"] = [] }])
+        let versionOne = Data(#"{ "folders": [], "schemaVersion": 1 }"#.utf8)
+
+        let manifest = try VersionedFile.decode(LibraryManifest.self, from: versionOne, migration: migration)
+
+        #expect(manifest.schemaVersion == 2)
+        #expect(manifest.tags.isEmpty)
+    }
+
+    @Test func aFileWithoutASchemaVersionIsUnreadable() {
+        #expect(throws: VersionedFileError.unreadable) {
+            try VersionedFile.decode(
+                LibraryManifest.self,
+                from: Data(#"{ "folders": [], "tags": [] }"#.utf8),
+                migration: LibraryManifest.migration
             )
         }
     }
@@ -51,7 +71,7 @@ struct VersionedFileTests {
         _ = try VersionedFile.read(
             LibraryManifest.self,
             from: [current, previous],
-            supportedSchemaVersion: LibraryManifest.currentSchemaVersion,
+            migration: LibraryManifest.migration,
             movingDamagedTo: recovered
         )
 

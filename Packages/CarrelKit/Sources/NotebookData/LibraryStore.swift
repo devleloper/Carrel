@@ -52,7 +52,7 @@ public actor LibraryStore {
                     LibraryLayout.manifestURL(in: libraryDirectory),
                     LibraryLayout.previousManifestURL(in: libraryDirectory),
                 ],
-                supportedSchemaVersion: LibraryManifest.currentSchemaVersion,
+                migration: LibraryManifest.migration,
                 movingDamagedTo: recoveredDirectory
             )
         } catch VersionedFileError.newerSchema {

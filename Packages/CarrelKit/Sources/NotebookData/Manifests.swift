@@ -3,7 +3,8 @@ import NotebookDomain
 
 /// Contents of `notebook.json`: the notebook and the metadata of its pages. Ink lives in separate files.
 public struct NotebookManifest: Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    static let migration = SchemaMigration()
+    public static let currentSchemaVersion = migration.currentVersion
 
     public private(set) var schemaVersion: Int
     public internal(set) var notebook: Notebook
@@ -104,7 +105,8 @@ extension NotebookManifest {
 
 /// Contents of `library.json`: folders and tags. Notebooks describe themselves in their own packages.
 public struct LibraryManifest: Hashable, Codable, Sendable {
-    public static let currentSchemaVersion = 1
+    static let migration = SchemaMigration()
+    public static let currentSchemaVersion = migration.currentVersion
 
     public private(set) var schemaVersion: Int
     public internal(set) var folders: [Folder]
@@ -123,7 +125,7 @@ public struct LibraryManifest: Hashable, Codable, Sendable {
     }
 }
 
-/// Reads only the schema version, so a file from a newer app is recognised before full decoding fails.
+/// Reads only the schema version, which decides whether a file needs migrating or comes from a newer app.
 struct SchemaProbe: Decodable {
     let schemaVersion: Int
 }
