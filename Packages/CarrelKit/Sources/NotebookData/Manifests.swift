@@ -68,7 +68,7 @@ extension NotebookManifest {
         return page
     }
 
-    /// Inserts a copy of a page right after it. The caller copies the ink file.
+    /// Inserts a copy of a page right after it. The caller copies the ink file; images share their assets.
     mutating func insertCopy(of pageID: Page.ID, hasInk: Bool, now: Date) -> Page? {
         guard let source = pages.first(where: { $0.id == pageID }) else {
             return nil
@@ -82,6 +82,10 @@ extension NotebookManifest {
         copy.tagIDs = source.tagIDs
         copy.hasInk = hasInk
         copy.inkHash = hasInk ? source.inkHash : nil
+        // Fresh IDs keep every placement on exactly one page, so selecting or removing one never touches the copy.
+        copy.imagePlacements = source.imagePlacements.map {
+            ImagePlacement(assetID: $0.assetID, frame: $0.frame, rotation: $0.rotation)
+        }
         pages.append(copy)
         return copy
     }

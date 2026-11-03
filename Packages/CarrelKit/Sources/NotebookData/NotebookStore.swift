@@ -25,6 +25,8 @@ public enum NotebookStoreError: Error, Equatable, Sendable {
     case imageUnreadable
     /// The image could be read but not stored as HEIC.
     case imageEncodingFailed
+    /// A placement names an asset whose file is not in the package.
+    case assetMissing
 }
 
 /// An image stored as an asset of a notebook, ready to be placed on its pages.
@@ -235,6 +237,69 @@ public actor NotebookStore {
         return FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) ? url : nil
     }
 
+    /// Places an imported image on a page, on top of its other images. The asset must be on disk, so the manifest
+    /// never references a file that is not there.
+    public func addImagePlacement(_ placement: ImagePlacement, toPage pageID: Page.ID, now: Date = .now) throws {
+        guard imageURL(for: placement.assetID) != nil else {
+            throw NotebookStoreError.assetMissing
+        }
+        try editImagePlacements(onPage: pageID, now: now) { placements in
+            if !placements.contains(where: { $0.id == placement.id }) {
+                placements.append(placement)
+            }
+        }
+    }
+
+    /// Moves, resizes or rotates an image on a page.
+    public func updateImagePlacement(
+        _ placementID: ImagePlacement.ID,
+        onPage pageID: Page.ID,
+        frame: PageRect,
+        rotation: Double,
+        now: Date = .now
+    ) throws {
+        try editImagePlacements(onPage: pageID, now: now) { placements in
+            guard let index = placements.firstIndex(where: { $0.id == placementID }) else {
+                return
+            }
+            placements[index].frame = frame
+            placements[index].rotation = rotation
+        }
+    }
+
+    /// Takes an image off a page. Its asset stays on disk until a purge finds it unused.
+    public func removeImagePlacement(
+        _ placementID: ImagePlacement.ID,
+        fromPage pageID: Page.ID,
+        now: Date = .now
+    )
+        throws
+    {
+        try editImagePlacements(onPage: pageID, now: now) { placements in
+            placements.removeAll { $0.id == placementID }
+        }
+    }
+
+    /// Commits a change to the images of a page. A change that leaves them as they were, because the page or the
+    /// placement does not exist, writes nothing and keeps the modification dates.
+    private func editImagePlacements(
+        onPage pageID: Page.ID,
+        now: Date,
+        _ change: (inout [ImagePlacement]) -> Void
+    ) throws {
+        guard let pageIndex = manifest.pageIndex(of: pageID) else {
+            return
+        }
+        var placements = manifest.pages[pageIndex].imagePlacements
+        change(&placements)
+        guard placements != manifest.pages[pageIndex].imagePlacements else {
+            return
+        }
+        var updated = manifest
+        updated.updatePage(pageID, now: now) { $0.imagePlacements = placements }
+        try commitEdit(updated, now: now)
+    }
+
     /// Writes an asset unless an intact copy is already there. A damaged copy is moved to the recovery folder
     /// before it is replaced, like any other damaged file.
     private func storeImageAsset(_ heic: Data) throws -> AssetID {
@@ -262,7 +327,8 @@ public actor NotebookStore {
         return page
     }
 
-    /// Inserts a copy of a page, ink included, right after it. Returns `nil` when the page does not exist.
+    /// Inserts a copy of a page, ink and images included, right after it. Returns `nil` when the page does not
+    /// exist.
     public func duplicatePage(_ pageID: Page.ID, now: Date = .now) throws -> Page? {
         let sourceURL = package.inkURL(for: pageID)
         let hasInkFile = FileManager.default.fileExists(atPath: sourceURL.path(percentEncoded: false))
