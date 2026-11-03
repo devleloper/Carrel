@@ -29,9 +29,9 @@ reads from the URL its store resolves. Both run their tests on the Mac host with
 | `Carrel/Features/Library` | `LibraryModel`, library screens, new notebook sheet |
 | `Carrel/Features/Editor` | `EditorSession`, `DrawingCache`, `NotebookCanvasViewController`, `PageStackLayout`, `PencilInteractionHandler`, `ToolPaletteModel`, palettes, page overview |
 | `Carrel/Features/Settings` | `BackupModel`, settings screen |
-| `Carrel/Features/Shared` | `UserFacingError`, the error alert, presentation bindings, the share sheet |
+| `Carrel/Features/Shared` | `UserFacingError`, the error alert, presentation bindings, the share sheet, `PaperChooser` |
 | `Carrel/Services` | `InkCodec`, `InkRenderer`, `PaperRenderer`, `PDFExporter`, `BackgroundTask` |
-| `Carrel/DesignSystem` | Reading Room `Palette` and `Theme`, `InkPalette`, `CoverAppearance`, paper previews and names |
+| `Carrel/DesignSystem` | Reading Room `Palette` and `Theme`, `InkPalette`, `CoverAppearance`, paper previews, swatches, names, and the appearance and edge each tone gives a page |
 
 ## Design rules
 
