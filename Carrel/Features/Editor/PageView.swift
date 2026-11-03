@@ -37,6 +37,15 @@ final class PageView: UIView {
     /// Paper and size the next-page outline previews.
     var outlinePaper = Paper.standard
     var outlineSize = PageSize.a4
+    /// Whether the desk shows beside the page. A page that spans the window has no shadow: it would only fall on
+    /// the strip of desk between pages and read as a border.
+    var showsEdges = true {
+        didSet {
+            if oldValue != showsEdges {
+                updateOutline()
+            }
+        }
+    }
 
     private(set) var canvas: PageCanvasView?
     /// Points on screen per point of page.
@@ -91,7 +100,8 @@ final class PageView: UIView {
         unavailableLabel.frame = bounds.insetBy(dx: 32, dy: 32)
         canvas?.frame = bounds
         outlineLayer.frame = bounds
-        outlineLayer.path = UIBezierPath(rect: bounds).cgPath
+        // Inset by half the line width, so the dashes stay whole when the outline spans the window.
+        outlineLayer.path = UIBezierPath(rect: bounds.insetBy(dx: 0.5, dy: 0.5)).cgPath
         layer.shadowPath = UIBezierPath(rect: bounds).cgPath
     }
 
@@ -132,7 +142,7 @@ final class PageView: UIView {
         let isOutline = page == nil && canvas?.pageID == nil
         outlineLayer.isHidden = !isOutline
         paperView.alpha = isOutline ? 0.45 : 1
-        layer.shadowOpacity = isOutline ? 0 : Float(Theme.Elevation.page)
+        layer.shadowOpacity = isOutline || !showsEdges ? 0 : Float(Theme.Elevation.page)
     }
 
     func pageDidMaterialize() {

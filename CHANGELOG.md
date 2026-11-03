@@ -19,6 +19,8 @@ All notable changes to this project are documented here. The format follows
 - Page overview with duplicate, reorder, delete and restore.
 - PDF export and a one-file library backup that can be restored from Settings.
 - Pages scroll under the editor's top bar, which softly fades them out beneath its controls.
+- Pages fill the width of the window; pinch out to 50% to see them on the desk, or in to 400%.
+- With Only Draw with Apple Pencil on, a double tap with a finger switches between the full width and 200%.
 
 ### Fixed
 

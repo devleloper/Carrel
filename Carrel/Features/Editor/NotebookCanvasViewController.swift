@@ -27,11 +27,12 @@ final class NotebookCanvasViewController: UIViewController {
     private var pageViews: [PageView] = []
     private var displayedPages: [Page] = []
     private var layout: PageStackLayout?
+    /// Relative to fitting the widest page to the window's width, within `PageStackLayout.zoomRange`.
     private var zoom: CGFloat = 1
     private var drawingPolicy: PKCanvasViewDrawingPolicy = .pencilOnly
     private var lastStrokePoint: CGPoint?
+    private let zoomTap = UITapGestureRecognizer()
 
-    private let maximumZoom: CGFloat = 4
     private let maximumLiveCanvases = 4
     private let layoutMetrics = PageStackLayout.Metrics()
     private static let directTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue)]
@@ -66,8 +67,9 @@ final class NotebookCanvasViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .clear
         configureScrollView()
-        addFingerTap(touches: 2, action: #selector(undoTapped))
-        addFingerTap(touches: 3, action: #selector(redoTapped))
+        addFingerTap(UITapGestureRecognizer(), touches: 2, action: #selector(undoTapped))
+        addFingerTap(UITapGestureRecognizer(), touches: 3, action: #selector(redoTapped))
+        addFingerTap(zoomTap, touches: 1, taps: 2, action: #selector(zoomTapped))
 
         let pencilInteraction = UIPencilInteraction()
         pencilInteraction.delegate = pencilHandler
@@ -195,8 +197,9 @@ final class NotebookCanvasViewController: UIViewController {
             zoom: zoom,
             metrics: layoutMetrics
         )
-        for (pageView, frame) in zip(pageViews, layout.pageFrames) {
-            pageView.frame = frame
+        for (index, pageView) in pageViews.enumerated() {
+            pageView.frame = layout.pageFrames[index]
+            pageView.showsEdges = layout.showsEdges(ofPageAt: index)
             pageView.apply(scale: layout.scale)
         }
         documentView.frame = CGRect(origin: .zero, size: layout.contentSize)
@@ -206,8 +209,23 @@ final class NotebookCanvasViewController: UIViewController {
     }
 
     private func updateZoomLimits() {
-        scrollView.minimumZoomScale = 1 / zoom
-        scrollView.maximumZoomScale = maximumZoom / zoom
+        scrollView.minimumZoomScale = PageStackLayout.zoomRange.lowerBound / zoom
+        scrollView.maximumZoomScale = PageStackLayout.zoomRange.upperBound / zoom
+    }
+
+    /// Lays the pages out at `newZoom`, a sharp re-render instead of a scaled bitmap, and scrolls so that
+    /// `anchor` sits at `viewportPoint`, a point in the scroll view's frame.
+    private func setZoom(_ newZoom: CGFloat, keeping anchor: PageStackLayout.Anchor?, at viewportPoint: CGPoint) {
+        zoom = PageStackLayout.restingZoom(after: newZoom)
+        scrollView.zoomScale = 1
+        updateZoomLimits()
+        layoutPages()
+        guard let anchor, let location = layout?.location(of: anchor) else {
+            return
+        }
+        scrollView.contentOffset = clampedOffset(
+            CGPoint(x: location.x - viewportPoint.x, y: location.y - viewportPoint.y)
+        )
     }
 
     /// The bar's height arrives after the first layout; a notebook resting at its top stays there, so the first
@@ -344,18 +362,21 @@ final class NotebookCanvasViewController: UIViewController {
 
     // MARK: Input
 
-    private func addFingerTap(touches: Int, action: Selector) {
-        let tap = UITapGestureRecognizer(target: self, action: action)
+    private func addFingerTap(_ tap: UITapGestureRecognizer, touches: Int, taps: Int = 1, action: Selector) {
+        tap.addTarget(self, action: action)
         tap.numberOfTouchesRequired = touches
+        tap.numberOfTapsRequired = taps
         tap.allowedTouchTypes = Self.directTouchTypes
         scrollView.addGestureRecognizer(tap)
     }
 
-    /// Follows Settings › Apple Pencil › Only Draw with Apple Pencil. When fingers may draw, scrolling needs two.
+    /// Follows Settings › Apple Pencil › Only Draw with Apple Pencil. When fingers may draw, scrolling needs two
+    /// and there is no double tap to zoom, which would be indistinguishable from two dots.
     private func applyInputPolicy() {
         let pencilOnly = UIPencilInteraction.prefersPencilOnlyDrawing
         drawingPolicy = pencilOnly ? .pencilOnly : .anyInput
         scrollView.panGestureRecognizer.minimumNumberOfTouches = pencilOnly ? 1 : 2
+        zoomTap.isEnabled = pencilOnly
         for canvas in liveCanvases {
             canvas.drawingPolicy = drawingPolicy
         }
@@ -376,6 +397,27 @@ final class NotebookCanvasViewController: UIViewController {
             session.undoManager.redo()
         }
     }
+
+    /// Switches between fitting the width and `PageStackLayout.doubleTapZoom`, keeping the tapped spot under the
+    /// finger.
+    @objc private func zoomTapped(_ tap: UITapGestureRecognizer) {
+        let target = PageStackLayout.zoomAfterDoubleTap(from: zoom)
+        let tapInDocument = tap.location(in: documentView)
+        let tapInViewport = tap.location(in: view)
+        guard !UIAccessibility.isReduceMotionEnabled else {
+            setZoom(target, keeping: layout?.anchor(at: tapInDocument), at: tapInViewport)
+            return
+        }
+        // The animated zoom ends in scrollViewDidEndZooming, which lays the pages out sharply at the new zoom.
+        let scale = target / zoom
+        let visibleRect = CGRect(
+            x: tapInDocument.x - tapInViewport.x / scale,
+            y: tapInDocument.y - tapInViewport.y / scale,
+            width: scrollView.bounds.width / scale,
+            height: scrollView.bounds.height / scale
+        )
+        scrollView.zoom(to: visibleRect, animated: true)
+    }
 }
 
 extension NotebookCanvasViewController: UIScrollViewDelegate {
@@ -387,26 +429,22 @@ extension NotebookCanvasViewController: UIScrollViewDelegate {
         updateLiveCanvases()
     }
 
+    /// Below fit-to-width the scaled document is narrower than the scroll view, which would pin it to the leading
+    /// edge for the rest of the pinch.
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        let margin = max((scrollView.bounds.width - scrollView.contentSize.width) / 2, 0)
+        documentView.center.x = scrollView.contentSize.width / 2 + margin
+    }
+
     /// Converts the pinch into a new page scale and lays the pages out again, so ink is re-rendered sharply
     /// instead of staying a scaled bitmap.
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-        let previousZoom = zoom
-        let visibleCenter = CGPoint(
-            x: (scrollView.contentOffset.x + scrollView.bounds.width / 2) / scale,
-            y: (scrollView.contentOffset.y + scrollView.bounds.height / 2) / scale
+        let viewportCenter = CGPoint(x: scrollView.bounds.width / 2, y: scrollView.bounds.height / 2)
+        let centerInDocument = documentView.convert(
+            CGPoint(x: scrollView.bounds.midX, y: scrollView.bounds.midY),
+            from: scrollView
         )
-        zoom = min(max(zoom * scale, 1), maximumZoom)
-        scrollView.zoomScale = 1
-        updateZoomLimits()
-        layoutPages()
-
-        let factor = zoom / previousZoom
-        scrollView.contentOffset = clampedOffset(
-            CGPoint(
-                x: visibleCenter.x * factor - scrollView.bounds.width / 2,
-                y: visibleCenter.y * factor - scrollView.bounds.height / 2
-            )
-        )
+        setZoom(zoom * scale, keeping: layout?.anchor(at: centerInDocument), at: viewportCenter)
     }
 }
 
