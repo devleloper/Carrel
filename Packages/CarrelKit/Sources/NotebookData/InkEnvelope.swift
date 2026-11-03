@@ -49,7 +49,7 @@ public enum InkEnvelope {
     }
 
     public static func hash(of payload: Data) -> InkHash {
-        InkHash(rawValue: SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined())
+        InkHash(rawValue: SHA256.hexDigest(of: payload))
     }
 }
 

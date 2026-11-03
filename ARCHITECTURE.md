@@ -15,15 +15,16 @@ flowchart TB
     Data --> Domain
 ```
 
-Dependencies point inward. `NotebookDomain` imports only Foundation. `NotebookData` adds CryptoKit, Apple
-Archive, System (file paths for Apple Archive) and Observation (the autosaver's save status). Neither knows about
-UIKit or PencilKit: ink crosses the boundary as `InkData`, opaque bytes plus the PencilKit content version
-needed to read them. Both run their tests on the Mac host with `swift test`.
+Dependencies point inward. `NotebookDomain` imports only Foundation. `NotebookData` adds CryptoKit, ImageIO
+(downscaling imported images and encoding them as HEIC), Apple Archive, System (file paths for Apple Archive) and
+Observation (the autosaver's save status). Neither knows about UIKit or PencilKit: ink crosses the boundary as
+`InkData`, opaque bytes plus the PencilKit content version needed to read them, and images as files the editor
+reads from the URL its store resolves. Both run their tests on the Mac host with `swift test`.
 
 | Where | What |
 |---|---|
 | `Packages/CarrelKit/Sources/NotebookDomain` | `Notebook`, `Page`, `PageSize`, `ImagePlacement`, `PageRect`, `Folder`, `Paper`, `Cover`, `SortKey`, `Title`, `AutosavePolicy` |
-| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore` (catalog and folders), `NotebookStore` (one notebook and every edit of it), `InkAutosaver`, `SnapshotStore`, `LibraryBackup`, `InkEnvelope`, `VersionedFile`, `SchemaMigration`, `LibraryLayout` |
+| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore` (catalog and folders), `NotebookStore` (one notebook and every edit of it), `InkAutosaver`, `SnapshotStore`, `LibraryBackup`, `InkEnvelope`, `ImageAssetEncoder`, `VersionedFile`, `SchemaMigration`, `LibraryLayout` |
 | `Carrel/App` | `CarrelApp`, `AppDependencies` (the composition root) |
 | `Carrel/Features/Library` | `LibraryModel`, library screens, new notebook sheet |
 | `Carrel/Features/Editor` | `EditorSession`, `DrawingCache`, `NotebookCanvasViewController`, `PageStackLayout`, `PencilInteractionHandler`, `ToolPaletteModel`, palettes, page overview |
@@ -75,6 +76,9 @@ Application Support/Carrel/
   never mistaken for an empty page: its previous generation is used, and if there is none the editor tells the
   user that the page's ink is missing.
 - Ink written by a newer PencilKit opens read-only and is never rewritten.
+- An imported image is downscaled to at most 4096 px on its long side, stored as HEIC without the original's
+  metadata and named by the SHA-256 of the file, so importing it again reuses the file. The file is on disk
+  before a page references it.
 - A notebook package that cannot be read stays where it is; the library reports it instead of hiding it.
 - A manifest of an older schema version is migrated in memory, in steps over its JSON before decoding, and
   reaches the disk in the new version only with the next change. The library snapshots such a notebook when it

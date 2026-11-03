@@ -102,4 +102,20 @@ public struct NotebookPackage: Sendable {
         }
         return UUID(uuidString: url.deletingPathExtension().lastPathComponent)
     }
+
+    public var assetsDirectory: URL {
+        url.appending(path: "assets", directoryHint: .isDirectory)
+    }
+
+    public func imageURL(for assetID: AssetID) -> URL {
+        assetsDirectory.appending(path: "\(assetID.rawValue).heic")
+    }
+
+    /// The asset an image file holds, or `nil` for anything else in the assets folder.
+    static func assetID(ofImageFile url: URL) -> AssetID? {
+        guard url.pathExtension == "heic" else {
+            return nil
+        }
+        return AssetID(rawValue: url.deletingPathExtension().lastPathComponent)
+    }
 }

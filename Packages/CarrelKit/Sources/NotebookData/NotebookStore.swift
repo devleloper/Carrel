@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import NotebookDomain
 
@@ -20,6 +21,18 @@ public enum NotebookStoreError: Error, Equatable, Sendable {
     case manifestUnreadable
     case schemaNewerThanApp
     case requiresNewerSystem
+    /// The data is not an image ImageIO can read.
+    case imageUnreadable
+    /// The image could be read but not stored as HEIC.
+    case imageEncodingFailed
+}
+
+/// An image stored as an asset of a notebook, ready to be placed on its pages.
+public struct ImportedImage: Hashable, Sendable {
+    public let assetID: AssetID
+    /// The size of the stored image, downscaled and upright, for the aspect ratio of a new placement.
+    public let pixelWidth: Int
+    public let pixelHeight: Int
 }
 
 /// Owns one notebook package on disk and serializes every write to it.
@@ -201,6 +214,43 @@ public actor NotebookStore {
             keepingPreviousAt: package.previousInkURL(for: pageID)
         )
         writtenInkHashes[pageID] = hash
+    }
+
+    // MARK: Images
+
+    /// Stores an image as an asset of this notebook: downscaled, encoded as HEIC and named by its SHA-256, so an
+    /// image that is already stored is reused. The asset is on disk before any placement can reference it.
+    ///
+    /// Encoding runs off this actor and never holds up saving ink.
+    @concurrent
+    public nonisolated func importImage(_ imageData: Data) async throws -> ImportedImage {
+        let encoded = try ImageAssetEncoder.encode(imageData)
+        let assetID = try await storeImageAsset(encoded.heic)
+        return ImportedImage(assetID: assetID, pixelWidth: encoded.pixelWidth, pixelHeight: encoded.pixelHeight)
+    }
+
+    /// The file of an image asset, for reading, or `nil` when it is not on disk.
+    public nonisolated func imageURL(for assetID: AssetID) -> URL? {
+        let url = package.imageURL(for: assetID)
+        return FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) ? url : nil
+    }
+
+    /// Writes an asset unless an intact copy is already there. A damaged copy is moved to the recovery folder
+    /// before it is replaced, like any other damaged file.
+    private func storeImageAsset(_ heic: Data) throws -> AssetID {
+        guard let assetID = AssetID(rawValue: SHA256.hexDigest(of: heic)) else {
+            throw NotebookStoreError.imageEncodingFailed
+        }
+        let url = package.imageURL(for: assetID)
+        guard (try? Data(contentsOf: url)) != heic else {
+            return assetID
+        }
+        if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+            FileManager.default.quarantine(url, in: recoveredDirectory)
+        }
+        try FileManager.default.createDirectory(at: package.assetsDirectory, withIntermediateDirectories: true)
+        try heic.write(to: url, options: .atomic)
+        return assetID
     }
 
     // MARK: Editing the notebook
