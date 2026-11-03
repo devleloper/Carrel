@@ -8,7 +8,7 @@ enum SchemaMigrationError: Error, Equatable {
 ///
 /// Steps edit the JSON object before it is decoded, so the `Codable` types describe only the current schema and
 /// never carry optional fields just to read old files. The migrated value reaches the disk with the next real
-/// change, not when the file is read: by then the notebook's snapshot holds the file as it was.
+/// change, not when the file is read, and the file it replaces stays beside it as the previous generation.
 struct SchemaMigration: Sendable {
     typealias Step = @Sendable (inout [String: Any]) throws -> Void
 

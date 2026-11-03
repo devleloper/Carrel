@@ -294,9 +294,7 @@ public actor NotebookStore {
         _ placementID: ImagePlacement.ID,
         fromPage pageID: Page.ID,
         now: Date = .now
-    )
-        throws
-    {
+    ) throws {
         try editImagePlacements(onPage: pageID, now: now) { placements in
             placements.removeAll { $0.id == placementID }
         }
