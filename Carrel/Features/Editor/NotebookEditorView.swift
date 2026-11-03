@@ -64,6 +64,9 @@ struct NotebookEditorView: View {
             }
         }
         .errorAlert($session.errorMessage)
+        // The zoom transition would otherwise take a pinch on the pages as a request to close the notebook: it would
+        // win the gesture from the canvas's zoom and close the editor without the save that `close()` waits for.
+        .interactiveDismissDisabled()
         .onChange(of: scenePhase) { _, phase in
             if phase != .active {
                 saveInBackground()

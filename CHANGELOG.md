@@ -24,3 +24,4 @@ All notable changes to this project are documented here. The format follows
 
 - A tap on the editor's top bar beside its buttons no longer scrolls the page or draws on it, with a finger or
   Apple Pencil.
+- A pinch on the pages no longer closes the editor without waiting for the save.
