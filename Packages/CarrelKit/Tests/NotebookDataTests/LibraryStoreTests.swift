@@ -100,20 +100,27 @@ struct LibraryStoreTests {
 
     // MARK: Backup
 
-    @Test func backupRestoresNotebooksAndInk() async throws {
+    @Test func backupRestoresNotebooksInkAndImages() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let backup = LibraryBackup(store: library)
         let notebook = try await createNotebook()
         let store = try await library.store(for: notebook.id)
         let pageID = try #require(await store.manifest.activePages.first?.id)
         try await store.saveInk(.sample(seed: 9), for: pageID)
+        let placement = try await store.placeTestImage(on: pageID)
+        let imageURL = try #require(store.imageURL(for: placement.assetID))
+        let image = try Data(contentsOf: imageURL)
         let archive = root.appending(path: "backup.aar")
 
         try await backup.write(to: archive)
         try await library.deleteNotebookPermanently(notebook.id)
         try await backup.restore(from: archive)
 
-        #expect(try await library.store(for: notebook.id).ink(for: pageID) == .ink(.sample(seed: 9)))
+        let restored = try await library.store(for: notebook.id)
+        #expect(await restored.ink(for: pageID) == .ink(.sample(seed: 9)))
+        #expect(await restored.manifest.pages.first?.imagePlacements == [placement])
+        let restoredImageURL = try #require(restored.imageURL(for: placement.assetID))
+        #expect(try Data(contentsOf: restoredImageURL) == image)
         #expect(replacedLibraries.count == 1)
     }
 
