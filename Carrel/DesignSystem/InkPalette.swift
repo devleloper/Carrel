@@ -33,4 +33,13 @@ enum InkPalette {
 
     static let pens = [carbon, inkBlue, sky, green, moss, vermilion, plum, lavender, sepia, graphite]
     static let highlighters = [yellow, blue, pink, mint]
+
+    /// The swatch's name. A color picked with the system color picker is described by the system, such as
+    /// "Custom Color, dark teal", so two custom colors never sound the same.
+    static func name(for hex: UInt32) -> LocalizedStringResource {
+        if let swatch = (pens + highlighters).first(where: { $0.hex == hex }) {
+            return swatch.name
+        }
+        return "Custom Color, \(UIColor(hex: hex).accessibilityName)"
+    }
 }

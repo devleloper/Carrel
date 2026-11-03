@@ -40,6 +40,9 @@
     "Blue" : {
 
     },
+    "Bold" : {
+
+    },
     "Burgundy Cloth" : {
 
     },
@@ -64,6 +67,9 @@
     "Cognac Leather" : {
 
     },
+    "Color" : {
+
+    },
     "Cover" : {
 
     },
@@ -74,6 +80,9 @@
 
     },
     "Custom Color" : {
+
+    },
+    "Custom Color, %@" : {
 
     },
     "Data" : {
@@ -109,6 +118,9 @@
     "Edited" : {
 
     },
+    "Erase" : {
+
+    },
     "Eraser" : {
 
     },
@@ -119,6 +131,9 @@
 
     },
     "Favorites" : {
+
+    },
+    "Fine" : {
 
     },
     "Fit Width" : {
@@ -175,10 +190,10 @@
     "Linen" : {
 
     },
-    "Mint" : {
+    "Medium" : {
 
     },
-    "Mode" : {
+    "Mint" : {
 
     },
     "Monoline" : {
@@ -287,10 +302,10 @@
     "Pink" : {
 
     },
-    "Plum" : {
+    "Pixel" : {
 
     },
-    "Precise" : {
+    "Plum" : {
 
     },
     "Recently Deleted" : {

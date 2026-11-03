@@ -1,95 +1,6 @@
 import PencilKit
 import SwiftUI
 
-enum EditorTool: Hashable {
-    case pen(Int)
-    case highlighter
-    case eraser
-    case lasso
-
-    var title: LocalizedStringResource {
-        switch self {
-        case .pen(let index): "Pen \(index + 1)"
-        case .highlighter: "Highlighter"
-        case .eraser: "Eraser"
-        case .lasso: "Lasso"
-        }
-    }
-}
-
-struct PenSettings: Codable, Hashable {
-    var inkType: InkType
-    var colorHex: UInt32
-    var width: CGFloat
-
-    enum InkType: String, Codable, CaseIterable {
-        case pen
-        case fountainPen
-        case monoline
-        case pencil
-
-        var pencilKitType: PKInkingTool.InkType {
-            switch self {
-            case .pen: .pen
-            case .fountainPen: .fountainPen
-            case .monoline: .monoline
-            case .pencil: .pencil
-            }
-        }
-
-        var title: LocalizedStringKey {
-            switch self {
-            case .pen: "Ballpoint"
-            case .fountainPen: "Fountain"
-            case .monoline: "Monoline"
-            case .pencil: "Pencil"
-            }
-        }
-    }
-}
-
-/// The user's palette. Persisted so pens, colors and widths survive relaunches.
-struct ToolSettings: Codable, Hashable {
-    var pens: [PenSettings]
-    var highlighterHex: UInt32
-    var highlighterWidth: CGFloat
-    var isPreciseEraser: Bool
-    var eraserWidth: CGFloat
-
-    static let standard = ToolSettings(
-        pens: [
-            PenSettings(inkType: .fountainPen, colorHex: InkPalette.carbon.hex, width: 3),
-            PenSettings(inkType: .fountainPen, colorHex: InkPalette.inkBlue.hex, width: 3),
-            PenSettings(inkType: .pen, colorHex: InkPalette.vermilion.hex, width: 2.5),
-        ],
-        highlighterHex: InkPalette.yellow.hex,
-        highlighterWidth: 22,
-        isPreciseEraser: false,
-        eraserWidth: 16
-    )
-
-    private static let defaultsKey = "toolSettings"
-
-    /// Settings saved with a different number of pens would leave palette slots without a pen, so they are
-    /// replaced by the standard palette.
-    static func load(from defaults: UserDefaults) -> ToolSettings {
-        guard
-            let data = defaults.data(forKey: defaultsKey),
-            let settings = try? JSONDecoder().decode(ToolSettings.self, from: data),
-            settings.pens.count == standard.pens.count
-        else {
-            return .standard
-        }
-        return settings
-    }
-
-    func save(to defaults: UserDefaults) {
-        if let data = try? JSONEncoder().encode(self) {
-            defaults.set(data, forKey: Self.defaultsKey)
-        }
-    }
-}
-
 /// The selected tool and the user's palette, shared by every notebook so the pen stays in hand between them.
 @Observable
 final class ToolPaletteModel {
@@ -97,6 +8,8 @@ final class ToolPaletteModel {
         didSet { settings.save(to: defaults) }
     }
     private(set) var selection: EditorTool = .pen(0)
+    /// The tool whose settings are open. It is always the selected tool.
+    private(set) var toolWithOpenSettings: EditorTool?
     var isRulerActive = false
     @ObservationIgnored private var previousSelection: EditorTool = .pen(0)
     @ObservationIgnored private let defaults: UserDefaults
@@ -106,12 +19,37 @@ final class ToolPaletteModel {
         self.settings = ToolSettings.load(from: defaults)
     }
 
+    /// Every tool in palette order: the favorite pens, then highlighter, eraser and lasso.
+    var tools: [EditorTool] {
+        settings.pens.indices.map(EditorTool.pen) + [.highlighter, .eraser, .lasso]
+    }
+
+    func pen(at index: Int) -> PenSettings? {
+        settings.pens.indices.contains(index) ? settings.pens[index] : nil
+    }
+
+    // MARK: Selection
+
+    /// The palette's one gesture: a tap selects a tool, and a tap on the selected tool opens its settings.
+    func choose(_ tool: EditorTool) {
+        if tool == selection {
+            toolWithOpenSettings = tool.hasSettings ? tool : nil
+        } else {
+            select(tool)
+        }
+    }
+
+    func dismissSettings() {
+        toolWithOpenSettings = nil
+    }
+
     func select(_ tool: EditorTool) {
         guard tool != selection else {
             return
         }
         previousSelection = selection
         selection = tool
+        toolWithOpenSettings = nil
     }
 
     func selectPrevious() {
@@ -126,29 +64,72 @@ final class ToolPaletteModel {
         }
     }
 
-    /// Every tool in palette order: the favorite pens, then highlighter, eraser and lasso.
-    var tools: [EditorTool] {
-        settings.pens.indices.map(EditorTool.pen) + [.highlighter, .eraser, .lasso]
+    // MARK: Tool settings
+
+    func color(of tool: EditorTool) -> UInt32? {
+        settings.colorPath(for: tool).map { settings[keyPath: $0] }
     }
 
-    func pen(at index: Int) -> PenSettings? {
-        settings.pens.indices.contains(index) ? settings.pens[index] : nil
+    func setColor(_ hex: UInt32, for tool: EditorTool) {
+        if let path = settings.colorPath(for: tool) {
+            settings[keyPath: path] = hex
+        }
     }
+
+    /// The width the tool draws with; `nil` for tools without one and for the eraser while it removes whole
+    /// strokes.
+    func width(of tool: EditorTool) -> StrokeWidth? {
+        if tool == .eraser, settings.eraser.mode == .stroke {
+            return nil
+        }
+        return settings.widthPath(for: tool).map { settings[keyPath: $0] }
+    }
+
+    func setWidth(_ width: StrokeWidth, for tool: EditorTool) {
+        if let path = settings.widthPath(for: tool) {
+            settings[keyPath: path] = width
+        }
+    }
+
+    /// How the tool is set up, in the words of its settings, such as "Ink Blue, Medium, Fountain". VoiceOver
+    /// reads it after the tool's name.
+    func summary(of tool: EditorTool) -> String {
+        var parts: [LocalizedStringResource] = []
+        if let hex = color(of: tool) {
+            parts.append(InkPalette.name(for: hex))
+        }
+        if tool == .eraser {
+            parts.append(settings.eraser.mode.title)
+        }
+        if let width = width(of: tool) {
+            parts.append(width.title)
+        }
+        if case .pen(let index) = tool, let pen = pen(at: index) {
+            parts.append(pen.inkType.title)
+        }
+        return parts.map { String(localized: $0) }.joined(separator: ", ")
+    }
+
+    // MARK: PencilKit
 
     var currentTool: any PKTool {
         switch selection {
         case .pen(let index):
             let pen = pen(at: index) ?? ToolSettings.standard.pens[0]
-            return PKInkingTool(pen.inkType.pencilKitType, color: UIColor(hex: pen.colorHex), width: pen.width)
+            return inkingTool(pen.inkType.pencilKitType, colorHex: pen.colorHex, width: pen.width)
         case .highlighter:
-            return PKInkingTool(.marker, color: UIColor(hex: settings.highlighterHex), width: settings.highlighterWidth)
+            return inkingTool(.marker, colorHex: settings.highlighter.colorHex, width: settings.highlighter.width)
         case .eraser:
-            if settings.isPreciseEraser {
-                return PKEraserTool(.bitmap, width: settings.eraserWidth)
+            switch settings.eraser.mode {
+            case .stroke: return PKEraserTool(.vector)
+            case .pixel: return PKEraserTool(.fixedWidthBitmap, width: settings.eraser.width.eraserPoints)
             }
-            return PKEraserTool(.vector)
         case .lasso:
             return PKLassoTool()
         }
+    }
+
+    private func inkingTool(_ inkType: PKInkingTool.InkType, colorHex: UInt32, width: StrokeWidth) -> PKInkingTool {
+        PKInkingTool(inkType, color: UIColor(hex: colorHex), width: width.points(for: inkType))
     }
 }
