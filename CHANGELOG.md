@@ -29,3 +29,4 @@ All notable changes to this project are documented here. The format follows
 - A tap on the editor's top bar beside its buttons no longer scrolls the page or draws on it, with a finger or
   Apple Pencil.
 - A pinch on the pages no longer closes the editor without waiting for the save.
+- The palette at the pen tip opens beside the pen instead of further down the page, and never under the top bar.

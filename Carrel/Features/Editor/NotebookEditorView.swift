@@ -7,6 +7,9 @@ struct NotebookEditorView: View {
     @Environment(ToolPaletteModel.self) private var palette
     @State private var quickPaletteLocation: CGPoint?
     @State private var topBarHeight: CGFloat = 0
+    /// The bar's lower edge in the window, which is also the canvas's coordinate space: the canvas fills the window.
+    @State private var topBarBottom: CGFloat = 0
+    @State private var quickPaletteHeight: CGFloat = 0
     @State private var isShowingOverview = false
     @State private var exportedFile: SharedFile?
     @State private var isRenaming = false
@@ -40,8 +43,9 @@ struct NotebookEditorView: View {
                 },
                 onExport: { Task { await exportPDF() } }
             )
-            .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
-                topBarHeight = height
+            .onGeometryChange(for: CGRect.self, of: { $0.frame(in: .global) }) { frame in
+                topBarHeight = frame.height
+                topBarBottom = frame.maxY
             }
         }
         .overlay(alignment: .leading) {
@@ -110,9 +114,19 @@ struct NotebookEditorView: View {
                         quickPaletteLocation = nil
                     }
                 }
-                .position(x: location.x, y: max(location.y - 80, 80))
+                .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+                    quickPaletteHeight = height
+                }
+                // Kept below the top bar, which lies above this overlay and would take every touch on the palette.
+                .position(
+                    x: location.x,
+                    y: max(location.y - 80, topBarBottom + quickPaletteHeight / 2 + Theme.Spacing.s)
+                )
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
+            // The location is in the canvas's coordinates, which span the window; inside the safe area the palette
+            // would open the height of the status bar and the top bar below the pen tip.
+            .ignoresSafeArea()
         }
     }
 
