@@ -1,6 +1,6 @@
 # Carrel
 
-[![CI](https://github.com/devleloper/notebook/actions/workflows/ci.yml/badge.svg)](https://github.com/devleloper/notebook/actions/workflows/ci.yml)
+[![CI](https://github.com/devleloper/Carrel/actions/workflows/ci.yml/badge.svg)](https://github.com/devleloper/Carrel/actions/workflows/ci.yml)
 
 A native iPadOS notebook for handwritten notes: a quiet, cozy place to write with Apple Pencil, built for lectures and study first.
 

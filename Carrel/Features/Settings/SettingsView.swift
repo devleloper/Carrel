@@ -116,7 +116,7 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("About") {
             LabeledContent("Version", value: appVersion)
-            if let sourceURL = URL(string: "https://github.com/devleloper/notebook") {
+            if let sourceURL = URL(string: "https://github.com/devleloper/Carrel") {
                 Link("Source Code", destination: sourceURL)
             }
             LabeledContent("Tracking") {
