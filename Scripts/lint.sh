@@ -15,7 +15,8 @@ else
 fi
 
 status=0
-if grep -rn --include='*.swift' -E '\b(TODO|FIXME)\b' "${sources[@]}"; then
+# SwiftPM's generated sources in .build carry their own TODOs after a local `swift test`.
+if grep -rn --include='*.swift' --exclude-dir=.build -E '\b(TODO|FIXME)\b' "${sources[@]}"; then
   echo "Resolve TODO/FIXME comments or turn them into issues." >&2
   status=1
 fi
