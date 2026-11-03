@@ -12,16 +12,8 @@ final class LibraryFlowTests: XCTestCase {
     }
 
     @MainActor
-    private func launch() -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
-        app.launch()
-        return app
-    }
-
-    @MainActor
     func testCreatingANotebookOpensItAndKeepsItInTheLibrary() throws {
-        let app = launch()
+        let app = XCUIApplication.launchedForUITesting()
 
         app.buttons["newNotebook"].firstMatch.tap()
         let titleField = app.textFields["notebookTitle"]
@@ -42,7 +34,7 @@ final class LibraryFlowTests: XCTestCase {
 
     @MainActor
     func testTheEmptyLibraryPassesTheAccessibilityAudit() throws {
-        let app = launch()
+        let app = XCUIApplication.launchedForUITesting()
 
         try app.performAccessibilityAudit(for: Self.audits)
     }

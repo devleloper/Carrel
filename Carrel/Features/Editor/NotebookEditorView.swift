@@ -166,7 +166,10 @@ private struct EditorTopBar: View {
             }
         }
         .padding(.horizontal, Theme.Spacing.l)
-        .padding(.top, Theme.Spacing.s)
+        .padding(.vertical, Theme.Spacing.s)
+        // Pages lie under the whole bar. Without a shape, only the buttons themselves are hit-testable and every
+        // other touch in the bar, including one just beside a button, reaches the canvas and scrolls or draws.
+        .contentShape(.rect)
     }
 
     private var statusLine: String {
