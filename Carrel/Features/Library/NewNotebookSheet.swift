@@ -26,27 +26,13 @@ struct NewNotebookSheet: View {
                     .padding(.vertical, Theme.Spacing.s)
                 }
                 Section("Paper") {
-                    Picker("Style", selection: $draft.paper.style) {
-                        ForEach(PaperStyle.allCases, id: \.self) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    Picker("Tone", selection: $draft.paper.tone) {
-                        ForEach(PaperTone.available, id: \.self) { tone in
-                            Text(tone.title).tag(tone)
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    PaperChooser(paper: $draft.paper)
+                        .padding(.vertical, Theme.Spacing.s)
                     Picker("Size", selection: $draft.pageSize) {
                         Text("A4").tag(PageSize.a4)
                         Text("Letter").tag(PageSize.letter)
                         Text("A4 Landscape").tag(PageSize.a4.landscape)
                     }
-                    PaperPreview(paper: draft.paper, size: draft.pageSize)
-                        .aspectRatio(draft.pageSize.width / draft.pageSize.height, contentMode: .fit)
-                        .frame(maxHeight: 220)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityHidden(true)
                 }
             }
             .navigationTitle("New Notebook")

@@ -8,7 +8,10 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - Library with folders, favorites, search by title and a Trash that keeps notebooks and pages for 30 days.
-- New notebook sheet with 12 covers, six paper styles in White and Cream, A4, Letter and A4 Landscape.
+- New notebook sheet with 12 covers, six paper styles in White, Cream, Linen and Night shown as real paper
+  swatches, A4, Letter and A4 Landscape.
+- Night paper for writing in the evening: ink is shown converted for dark paper in the editor, the page overview and
+  exported PDFs, while the colors stored in the notebook stay the same.
 - Editor with a vertical stream of pages, pinch to zoom, and a next page that appears with the first stroke.
 - Palette with three favorite pens, highlighter, eraser and lasso; tap a selected tool again for its settings.
 - Tool settings with three widths for every tool, four ink types and a custom color for pens, and an eraser that

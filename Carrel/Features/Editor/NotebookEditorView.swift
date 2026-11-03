@@ -205,7 +205,7 @@ private struct EditorTopBar: View {
                     }
                 }
                 Section("Tone for All Pages") {
-                    ForEach(PaperTone.available, id: \.self) { tone in
+                    ForEach(PaperTone.allCases, id: \.self) { tone in
                         Button(tone.title) {
                             let paper = Paper(style: page.paper.style, tone: tone)
                             Task { await session.setPaperForAllPages(paper) }

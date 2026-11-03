@@ -9,6 +9,7 @@ enum Theme {
     static let secondaryAccent = Color(uiColor: Palette.secondaryAccent)
     static let destructive = Color(uiColor: Palette.destructive)
     static let pageShadow = Color(uiColor: Palette.pageShadow)
+    static let separator = Color(uiColor: Palette.separator)
 
     enum Spacing {
         static let xs: CGFloat = 4

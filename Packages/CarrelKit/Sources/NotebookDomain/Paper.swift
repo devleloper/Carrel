@@ -25,12 +25,11 @@ public enum PaperStyle: String, Codable, CaseIterable, Sendable {
     case dots
 }
 
+/// The color of the paper. Every tone has been part of the stored format since version 1, so a notebook on any of
+/// them opens in every build that reads that version.
 public enum PaperTone: String, Codable, CaseIterable, Sendable {
     case white
     case cream
     case linen
     case night
-
-    /// Tones offered when creating a notebook; Linen and Night arrive with the 1.0 personalization work.
-    public static let available: [PaperTone] = [.white, .cream]
 }

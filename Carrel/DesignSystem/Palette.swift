@@ -10,6 +10,7 @@ enum Palette {
     static let secondaryAccent = UIColor(light: 0x9A6A2C, dark: 0xD8A866)
     static let destructive = UIColor(light: 0xB3261E, dark: 0xF28B82)
     static let pageShadow = UIColor(light: 0x3B2A1A, dark: 0x000000)
+    static let separator = UIColor(light: 0xDDD2C2, dark: 0x3A332C)
     /// Text printed on the paper labels of covers. Covers are objects on the desk and keep their colors in dark mode.
     static let coverLabelText = UIColor(hex: 0x2B241E)
     static let coverLabelPaper = UIColor(hex: 0xF6EEDC)
