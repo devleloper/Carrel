@@ -30,6 +30,8 @@ public enum NotebookStoreError: Error, Equatable, Sendable {
 public actor NotebookStore {
     public nonisolated let package: NotebookPackage
     public private(set) var manifest: NotebookManifest
+    /// The schema version `notebook.json` had when the store opened it. The first write replaces an older one.
+    nonisolated let loadedSchemaVersion: Int
 
     private let supportedContentVersion: Int
     private let recoveredDirectory: URL
@@ -40,11 +42,13 @@ public actor NotebookStore {
     private init(
         package: NotebookPackage,
         manifest: NotebookManifest,
+        loadedSchemaVersion: Int,
         supportedContentVersion: Int,
         recoveredDirectory: URL
     ) {
         self.package = package
         self.manifest = manifest
+        self.loadedSchemaVersion = loadedSchemaVersion
         self.supportedContentVersion = supportedContentVersion
         self.recoveredDirectory = recoveredDirectory
     }
@@ -63,6 +67,7 @@ public actor NotebookStore {
         return NotebookStore(
             package: package,
             manifest: manifest,
+            loadedSchemaVersion: NotebookManifest.currentSchemaVersion,
             supportedContentVersion: supportedContentVersion,
             recoveredDirectory: recoveredDirectory
         )
@@ -75,23 +80,29 @@ public actor NotebookStore {
         now: Date = .now
     ) throws -> NotebookStore {
         let package = NotebookPackage(url: url)
-        var manifest = try readManifest(of: package, movingDamagedTo: recoveredDirectory)
+        let loaded = try loadManifest(of: package, movingDamagedTo: recoveredDirectory)
+        var manifest = loaded.value
         if adoptOrphanInk(in: package, into: &manifest, now: now) {
             try VersionedFile.write(manifest, to: package.manifestURL, keepingPreviousAt: package.previousManifestURL)
         }
         return NotebookStore(
             package: package,
             manifest: manifest,
+            loadedSchemaVersion: loaded.schemaVersion,
             supportedContentVersion: supportedContentVersion,
             recoveredDirectory: recoveredDirectory
         )
     }
 
-    /// Reads the manifest. Listing the library passes no recovery folder, so it never moves files.
-    static func readManifest(
+    /// Reads the manifest for listing the library, which never moves files.
+    static func readManifest(of package: NotebookPackage) throws -> NotebookManifest {
+        try loadManifest(of: package, movingDamagedTo: nil).value
+    }
+
+    private static func loadManifest(
         of package: NotebookPackage,
-        movingDamagedTo recoveredDirectory: URL? = nil
-    ) throws -> NotebookManifest {
+        movingDamagedTo recoveredDirectory: URL?
+    ) throws -> VersionedFile.Generation<NotebookManifest> {
         do {
             return try VersionedFile.read(
                 NotebookManifest.self,

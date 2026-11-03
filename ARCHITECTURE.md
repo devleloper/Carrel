@@ -22,8 +22,8 @@ needed to read them. Both run their tests on the Mac host with `swift test`.
 
 | Where | What |
 |---|---|
-| `Packages/CarrelKit/Sources/NotebookDomain` | `Notebook`, `Page`, `PageSize`, `Folder`, `Paper`, `Cover`, `SortKey`, `Title`, `AutosavePolicy` |
-| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore` (catalog and folders), `NotebookStore` (one notebook and every edit of it), `InkAutosaver`, `SnapshotStore`, `LibraryBackup`, `InkEnvelope`, `VersionedFile`, `LibraryLayout` |
+| `Packages/CarrelKit/Sources/NotebookDomain` | `Notebook`, `Page`, `PageSize`, `ImagePlacement`, `PageRect`, `Folder`, `Paper`, `Cover`, `SortKey`, `Title`, `AutosavePolicy` |
+| `Packages/CarrelKit/Sources/NotebookData` | `LibraryStore` (catalog and folders), `NotebookStore` (one notebook and every edit of it), `InkAutosaver`, `SnapshotStore`, `LibraryBackup`, `InkEnvelope`, `VersionedFile`, `SchemaMigration`, `LibraryLayout` |
 | `Carrel/App` | `CarrelApp`, `AppDependencies` (the composition root) |
 | `Carrel/Features/Library` | `LibraryModel`, library screens, new notebook sheet |
 | `Carrel/Features/Editor` | `EditorSession`, `DrawingCache`, `NotebookCanvasViewController`, `PageStackLayout`, `PencilInteractionHandler`, `ToolPaletteModel`, palettes, page overview |
@@ -62,7 +62,8 @@ Application Support/Carrel/
 │   ├── library.json(.previous)    # folders and tags
 │   └── Notebooks/<id>.notebook/
 │       ├── notebook.json(.previous)
-│       └── ink/<pageID>.ink(.previous)
+│       ├── ink/<pageID>.ink(.previous)
+│       └── assets/<sha256>.heic   # images, immutable and shared by every placement that shows them
 ├── Snapshots/<id>/<timestamp>.notebook   # APFS clones taken when a notebook is opened
 └── Recovered/                     # damaged files and libraries replaced by a restore; never cleaned
 ```
@@ -75,8 +76,11 @@ Application Support/Carrel/
   user that the page's ink is missing.
 - Ink written by a newer PencilKit opens read-only and is never rewritten.
 - A notebook package that cannot be read stays where it is; the library reports it instead of hiding it.
-- The formats are pinned by golden tests (`FileFormatTests`): a change that would make existing files
-  unreadable fails the package tests.
+- A manifest of an older schema version is migrated in memory, in steps over its JSON before decoding, and
+  reaches the disk in the new version only with the next change. The library snapshots such a notebook when it
+  opens it, so the old version outlives that change. A newer version is neither opened nor rewritten.
+- The formats of every schema version are pinned by golden tests (`FileFormatTests`): a change that would make
+  existing files unreadable fails the package tests.
 
 ## Saving
 

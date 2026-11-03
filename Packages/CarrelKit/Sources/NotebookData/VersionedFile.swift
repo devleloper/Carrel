@@ -7,6 +7,13 @@ enum VersionedFileError: Error, Equatable {
 
 /// Reads JSON files that are written with a previous generation kept beside them.
 enum VersionedFile {
+    /// A decoded generation, with the schema version it was written in.
+    struct Generation<Value> {
+        let value: Value
+        /// Older than the current version when `value` was migrated on reading.
+        let schemaVersion: Int
+    }
+
     /// Decodes the first readable generation in `urls`, migrated to the current schema.
     ///
     /// A file written by a newer app stops the search: falling back to an older generation would silently
@@ -18,15 +25,15 @@ enum VersionedFile {
         from urls: [URL],
         migration: SchemaMigration,
         movingDamagedTo recoveredDirectory: URL? = nil
-    ) throws -> Value {
+    ) throws -> Generation<Value> {
         var damaged: [URL] = []
         for url in urls {
             guard let data = try? Data(contentsOf: url) else {
                 continue
             }
-            let value: Value
+            let generation: Generation<Value>
             do {
-                value = try decode(type, from: data, migration: migration)
+                generation = try decodeGeneration(type, from: data, migration: migration)
             } catch VersionedFileError.newerSchema {
                 throw VersionedFileError.newerSchema
             } catch {
@@ -36,18 +43,27 @@ enum VersionedFile {
             if let recoveredDirectory {
                 damaged.forEach { FileManager.default.quarantine($0, in: recoveredDirectory) }
             }
-            return value
+            return generation
         }
         throw VersionedFileError.unreadable
     }
 
-    /// Decodes one generation. The schema version is read first, so a file from a newer app is recognised
-    /// before decoding fails on fields this app does not know.
+    /// Decodes one generation, migrated to the current schema.
     static func decode<Value: Decodable>(
         _ type: Value.Type,
         from data: Data,
         migration: SchemaMigration
     ) throws -> Value {
+        try decodeGeneration(type, from: data, migration: migration).value
+    }
+
+    /// The schema version is read first, so a file from a newer app is recognised before decoding fails on fields
+    /// this app does not know.
+    private static func decodeGeneration<Value: Decodable>(
+        _ type: Value.Type,
+        from data: Data,
+        migration: SchemaMigration
+    ) throws -> Generation<Value> {
         guard let version = try? JSONCoding.decode(SchemaProbe.self, from: data).schemaVersion else {
             throw VersionedFileError.unreadable
         }
@@ -55,7 +71,8 @@ enum VersionedFile {
             throw VersionedFileError.newerSchema
         }
         do {
-            return try JSONCoding.decode(type, from: migration.migrate(data, from: version))
+            let value = try JSONCoding.decode(type, from: migration.migrate(data, from: version))
+            return Generation(value: value, schemaVersion: version)
         } catch {
             throw VersionedFileError.unreadable
         }

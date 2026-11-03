@@ -3,7 +3,7 @@ import NotebookDomain
 
 /// Contents of `notebook.json`: the notebook and the metadata of its pages. Ink lives in separate files.
 public struct NotebookManifest: Hashable, Codable, Sendable {
-    static let migration = SchemaMigration()
+    static let migration = SchemaMigration(steps: [addImagePlacements])
     public static let currentSchemaVersion = migration.currentVersion
 
     public private(set) var schemaVersion: Int
@@ -33,6 +33,20 @@ public struct NotebookManifest: Hashable, Codable, Sendable {
         case schemaVersion
         case notebook
         case pages
+    }
+}
+
+// MARK: - Migrations
+
+extension NotebookManifest {
+    /// Version 2 gives every page a list of image placements.
+    private static func addImagePlacements(to manifest: inout [String: Any]) throws {
+        guard let pages = manifest["pages"] as? [[String: Any]] else {
+            throw SchemaMigrationError.malformed
+        }
+        manifest["pages"] = pages.map { page in
+            page.merging(["imagePlacements": [Any]()]) { current, _ in current }
+        }
     }
 }
 

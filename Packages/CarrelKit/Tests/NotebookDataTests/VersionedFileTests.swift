@@ -17,7 +17,7 @@ struct VersionedFileTests {
             LibraryManifest.self,
             from: [current, previous],
             migration: LibraryManifest.migration
-        )
+        ).value
 
         #expect(manifest == LibraryManifest())
     }

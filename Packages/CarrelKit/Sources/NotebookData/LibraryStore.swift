@@ -54,7 +54,7 @@ public actor LibraryStore {
                 ],
                 migration: LibraryManifest.migration,
                 movingDamagedTo: recoveredDirectory
-            )
+            ).value
         } catch VersionedFileError.newerSchema {
             throw LibraryStoreError.schemaNewerThanApp
         } catch {
@@ -136,6 +136,13 @@ public actor LibraryStore {
             supportedContentVersion: supportedContentVersion,
             recoveredDirectory: layout.recoveredDirectory
         )
+        if store.loadedSchemaVersion < NotebookManifest.currentSchemaVersion {
+            // A library-side write, such as a purge or a favorite, can replace the old version before an editing
+            // session snapshots the notebook. No one holds the store yet, so its files are complete; if adopting
+            // orphan ink already wrote, the old manifest is the previous generation. Like every snapshot, a failed
+            // one must not keep the notebook from opening.
+            try? SnapshotStore(layout: layout).takeSnapshot(ofPackageAt: url, notebookID: notebookID)
+        }
         openStores[notebookID] = store
         return store
     }

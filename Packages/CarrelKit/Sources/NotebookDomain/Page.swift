@@ -11,6 +11,8 @@ public struct Page: Identifiable, Hashable, Codable, Sendable {
     /// silently opening empty.
     public var hasInk: Bool
     public var inkHash: InkHash?
+    /// Drawn in this order, so a later placement covers an earlier one.
+    public var imagePlacements: [ImagePlacement]
     public let createdAt: Date
     public var modifiedAt: Date
     public var deletedAt: Date?
@@ -24,6 +26,7 @@ public struct Page: Identifiable, Hashable, Codable, Sendable {
         self.tagIDs = []
         self.hasInk = false
         self.inkHash = nil
+        self.imagePlacements = []
         self.createdAt = now
         self.modifiedAt = now
         self.deletedAt = nil
@@ -42,6 +45,7 @@ public struct Page: Identifiable, Hashable, Codable, Sendable {
         case tagIDs
         case hasInk
         case inkHash
+        case imagePlacements
         case createdAt
         case modifiedAt
         case deletedAt
