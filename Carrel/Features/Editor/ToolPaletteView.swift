@@ -71,15 +71,17 @@ struct ToolPaletteView: View {
 
     private var paletteColumn: some View {
         VStack(spacing: Theme.Spacing.xs) {
-            Button("Collapse Palette", systemImage: "arrow.down.right.and.arrow.up.left") {
+            Button {
                 setCollapsed(true)
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.secondaryText)
+                    .frame(width: buttonSize, height: buttonSize)
+                    .contentShape(Circle())
             }
-            .labelStyle(.iconOnly)
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(Theme.secondaryText)
-            .frame(width: buttonSize, height: buttonSize)
-            .contentShape(Circle())
             .buttonStyle(.plain)
+            .accessibilityLabel("Collapse Palette")
             .accessibilityIdentifier("collapsePalette")
             .accessibilityAction(named: moveActionTitle, moveToOtherSide)
 
