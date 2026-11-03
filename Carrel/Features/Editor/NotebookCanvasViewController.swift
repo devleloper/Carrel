@@ -81,6 +81,22 @@ final class NotebookCanvasViewController: UIViewController {
             name: UIScene.didActivateNotification,
             object: nil
         )
+        // PencilKit closes an undo group after the stroke's change reaches the delegate, so the history is read
+        // from the undo manager's own notifications rather than from drawing changes.
+        let undoHistoryChanges: [Notification.Name] = [
+            .NSUndoManagerCheckpoint,
+            .NSUndoManagerDidCloseUndoGroup,
+            .NSUndoManagerDidUndoChange,
+            .NSUndoManagerDidRedoChange,
+        ]
+        for name in undoHistoryChanges {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(undoHistoryDidChange),
+                name: name,
+                object: session.undoManager
+            )
+        }
         applyInputPolicy()
     }
 
@@ -334,6 +350,7 @@ final class NotebookCanvasViewController: UIViewController {
         let image = pageView.page.flatMap { session.inkImage(for: $0, scale: scale) }
         canvas.delegate = nil
         undoManager?.removeAllActions(withTarget: canvas)
+        session.undoHistoryDidChange()
         pageView.detachCanvas(leaving: image)
     }
 
@@ -400,6 +417,10 @@ final class NotebookCanvasViewController: UIViewController {
 
     @objc private func sceneDidActivate() {
         applyInputPolicy()
+    }
+
+    @objc private func undoHistoryDidChange() {
+        session.undoHistoryDidChange()
     }
 
     @objc private func undoTapped() {

@@ -25,6 +25,10 @@ final class EditorSession: Identifiable {
     let id: Notebook.ID
     let autosaver: InkAutosaver
     let undoManager = UndoManager()
+    /// Whether Undo and Redo have anything to do. `UndoManager` is not observable, so the canvas reports every
+    /// change to the history through `undoHistoryDidChange()`.
+    private(set) var canUndo = false
+    private(set) var canRedo = false
     private(set) var notebook: Notebook
     private(set) var pages: [Page] = []
     private(set) var trashedPages: [Page] = []
@@ -96,6 +100,15 @@ final class EditorSession: Identifiable {
             return .editable(PKDrawing())
         case .requiresNewerSystem:
             return .readOnly(message: String(localized: "This page was written with a newer version of iPadOS."))
+        }
+    }
+
+    func undoHistoryDidChange() {
+        if canUndo != undoManager.canUndo {
+            canUndo = undoManager.canUndo
+        }
+        if canRedo != undoManager.canRedo {
+            canRedo = undoManager.canRedo
         }
     }
 

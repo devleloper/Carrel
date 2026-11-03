@@ -181,7 +181,9 @@ private struct EditorTopBar: View {
             GlassEffectContainer(spacing: Theme.Spacing.s) {
                 HStack(spacing: Theme.Spacing.s) {
                     Button("Undo", systemImage: "arrow.uturn.backward") { session.undoManager.undo() }
+                        .disabled(!session.canUndo)
                     Button("Redo", systemImage: "arrow.uturn.forward") { session.undoManager.redo() }
+                        .disabled(!session.canRedo)
                     Button("Pages", systemImage: "square.grid.2x2", action: onShowOverview)
                     moreMenu
                 }

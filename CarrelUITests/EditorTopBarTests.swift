@@ -23,16 +23,23 @@ final class EditorTopBarTests: XCTestCase {
         window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.6))
             .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.65)))
 
+        let undo = app.buttons["Undo"]
+        let redo = app.buttons["Redo"]
+        XCTAssertTrue(wait(for: undo, toBeEnabled: true), "The stroke should be undoable")
         for _ in 1...3 {
             XCTAssertTrue(wait(for: status, toEndWith: "Saved"))
             tapBesideTheButtons(in: app)
             XCTAssertFalse(wait(for: status, toEndWith: "Edited", timeout: 2), "A touch on the bar reached the page")
 
-            app.buttons["Undo"].tap()
-            XCTAssertTrue(wait(for: status, toEndWith: "Edited"), "Undo should remove the stroke")
+            // The buttons' state, unlike the status, does not change back by itself: autosave can turn Edited
+            // into Saved before a slow machine gets to look at the status.
+            undo.tap()
+            XCTAssertTrue(wait(for: undo, toBeEnabled: false), "Undo should remove the stroke")
+            XCTAssertTrue(redo.isEnabled)
             XCTAssertTrue(wait(for: status, toEndWith: "Saved"))
-            app.buttons["Redo"].tap()
-            XCTAssertTrue(wait(for: status, toEndWith: "Edited"), "Redo should bring the stroke back")
+            redo.tap()
+            XCTAssertTrue(wait(for: redo, toBeEnabled: false), "Redo should bring the stroke back")
+            XCTAssertTrue(undo.isEnabled)
 
             app.buttons["Pages"].tap()
             let done = app.buttons["Done"]
@@ -80,6 +87,14 @@ final class EditorTopBarTests: XCTestCase {
         for spot in spots {
             origin.withOffset(CGVector(dx: spot.x, dy: spot.y)).tap()
         }
+    }
+
+    /// Waits until a button is enabled or disabled.
+    @MainActor
+    private func wait(for button: XCUIElement, toBeEnabled isEnabled: Bool, timeout: TimeInterval = 10) -> Bool {
+        let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: isEnabled))
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: button)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
     /// Waits until the save status, "Page 1 of 2 · Saved" and the like, ends with `word`.

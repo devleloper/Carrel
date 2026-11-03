@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows
 - Page overview with duplicate, reorder, delete and restore.
 - PDF export and a one-file library backup that can be restored from Settings.
 - Pages scroll under the editor's top bar, which softly fades them out beneath its controls.
+- Undo and Redo in the top bar are dimmed when there is nothing to undo or redo.
 - Pages fill the width of the window; pinch out to 50% to see them on the desk, or in to 400%.
 - With Only Draw with Apple Pencil on, a double tap with a finger switches between the full width and 200%.
 - View menu Zoom In (⌘+), Zoom Out (⌘−) and Fit Width (⌘0) in the editor; Fit Width returns to the full width
