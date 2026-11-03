@@ -37,6 +37,41 @@ final class PaperFlowTests: XCTestCase {
         try app.performAccessibilityAudit(for: Self.audits)
         app.buttons["createNotebook"].tap()
 
-        XCTAssertTrue(app.buttons["closeEditor"].waitForExistence(timeout: 10), "Creating a notebook should open it")
+        let paperButton = app.buttons["paperChooser"]
+        XCTAssertTrue(paperButton.waitForExistence(timeout: 10), "Creating a notebook should open it")
+        paperButton.tap()
+        waitUntilSelected(app.buttons["paperTone.linen"])
+    }
+
+    @MainActor
+    func testNightPaperCanBeChosenForAPageFromTheTopBar() throws {
+        let app = launch()
+        app.buttons["newNotebook"].firstMatch.tap()
+        let titleField = app.textFields["notebookTitle"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 5))
+        titleField.tap()
+        titleField.typeText("Evening Notes")
+        app.buttons["createNotebook"].tap()
+        let paperButton = app.buttons["paperChooser"]
+        XCTAssertTrue(paperButton.waitForExistence(timeout: 10))
+
+        paperButton.tap()
+        let night = app.buttons["paperTone.night"]
+        XCTAssertTrue(night.waitForExistence(timeout: 5))
+        night.tap()
+        waitUntilSelected(night)
+        try app.performAccessibilityAudit(for: Self.audits)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        XCTAssertTrue(night.waitForNonExistence(timeout: 5), "The paper chooser should close")
+
+        // A reopened notebook gets a new session from the store, which takes a change only once it is written.
+        app.buttons["closeEditor"].tap()
+        let notebook = app.buttons["Evening Notes"]
+        XCTAssertTrue(notebook.waitForExistence(timeout: 5))
+        notebook.tap()
+        XCTAssertTrue(paperButton.waitForExistence(timeout: 10))
+        paperButton.tap()
+        XCTAssertTrue(night.waitForExistence(timeout: 5))
+        waitUntilSelected(night)
     }
 }

@@ -317,6 +317,9 @@
     "Paper" : {
 
     },
+    "Paper for This Page" : {
+
+    },
     "Pen %lld" : {
 
     },
@@ -431,9 +434,6 @@
     "This notebook couldn't be read. Its files were kept so it can be recovered." : {
 
     },
-    "This Page" : {
-
-    },
     "This page could not be read." : {
 
     },
@@ -447,9 +447,6 @@
 
     },
     "Tone" : {
-
-    },
-    "Tone for All Pages" : {
 
     },
     "Touch and hold a notebook, then choose Add to Favorites." : {
@@ -468,6 +465,9 @@
 
     },
     "Untitled" : {
+
+    },
+    "Use for All Pages" : {
 
     },
     "Vermilion" : {

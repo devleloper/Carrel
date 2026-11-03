@@ -152,6 +152,7 @@ private struct EditorTopBar: View {
                     Button("Redo", systemImage: "arrow.uturn.forward") { session.undoManager.redo() }
                         .disabled(!session.canRedo)
                     Button("Pages", systemImage: "square.grid.2x2", action: onShowOverview)
+                    PaperButton(session: session)
                     moreMenu
                 }
                 .labelStyle(.iconOnly)
@@ -183,7 +184,6 @@ private struct EditorTopBar: View {
     private var moreMenu: some View {
         Menu {
             Button("Rename…", systemImage: "pencil", action: onRename)
-            paperMenu
             Toggle("Ruler", systemImage: "ruler", isOn: $palette.isRulerActive)
             Divider()
             Button("Export PDF", systemImage: "square.and.arrow.up", action: onExport)
@@ -192,27 +192,4 @@ private struct EditorTopBar: View {
         }
     }
 
-    @ViewBuilder
-    private var paperMenu: some View {
-        if let page = session.currentPage {
-            Menu("Paper", systemImage: "doc.plaintext") {
-                Section("This Page") {
-                    ForEach(PaperStyle.allCases, id: \.self) { style in
-                        Button(style.title) {
-                            let paper = Paper(style: style, tone: page.paper.tone)
-                            Task { await session.setPaper(paper, forPage: page.id) }
-                        }
-                    }
-                }
-                Section("Tone for All Pages") {
-                    ForEach(PaperTone.allCases, id: \.self) { tone in
-                        Button(tone.title) {
-                            let paper = Paper(style: page.paper.style, tone: tone)
-                            Task { await session.setPaperForAllPages(paper) }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }

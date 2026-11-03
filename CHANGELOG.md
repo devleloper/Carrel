@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format follows
 - Night paper for writing in the evening: ink is shown converted for dark paper in the editor, the page overview and
   exported PDFs, while the colors stored in the notebook stay the same.
 - Editor with a vertical stream of pages, pinch to zoom, and a next page that appears with the first stroke.
+- Paper button in the editor's top bar: pick the tone and style of the current page from swatches, or use its
+  paper for all pages.
 - Palette with three favorite pens, highlighter, eraser and lasso; tap a selected tool again for its settings.
 - Tool settings with three widths for every tool, four ink types and a custom color for pens, and an eraser that
   removes whole strokes or erases pixels.
