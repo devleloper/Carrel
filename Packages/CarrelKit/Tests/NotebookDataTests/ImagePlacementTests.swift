@@ -8,13 +8,6 @@ struct ImagePlacementTests {
     private static let later = Date(timeIntervalSince1970: 1_900_000_000)
     private static let frame = PageRect(x: 72, y: 96, width: 240, height: 180)
 
-    private func placeImage(on fixture: NotebookFixture, now: Date = .now) async throws -> ImagePlacement {
-        let image = try await fixture.store.importImage(TestImage.png(width: 640, height: 480))
-        let placement = ImagePlacement(assetID: image.assetID, frame: Self.frame)
-        try await fixture.store.addImagePlacement(placement, toPage: fixture.pageID, now: now)
-        return placement
-    }
-
     private func page(of fixture: NotebookFixture, in store: NotebookStore? = nil) async throws -> Page {
         let manifest = await (store ?? fixture.store).manifest
         return try #require(manifest.pages.first { $0.id == fixture.pageID })
@@ -24,7 +17,7 @@ struct ImagePlacementTests {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
 
-        let placement = try await placeImage(on: fixture, now: Self.later)
+        let placement = try await fixture.store.placeTestImage(on: fixture.pageID, now: Self.later)
 
         #expect(try await page(of: fixture).modifiedAt == Self.later)
         #expect(await fixture.store.manifest.notebook.modifiedAt == Self.later)
@@ -35,8 +28,8 @@ struct ImagePlacementTests {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
 
-        let first = try await placeImage(on: fixture)
-        let second = try await placeImage(on: fixture)
+        let first = try await fixture.store.placeTestImage(on: fixture.pageID)
+        let second = try await fixture.store.placeTestImage(on: fixture.pageID)
 
         #expect(try await page(of: fixture).imagePlacements.map(\.id) == [first.id, second.id])
     }
@@ -59,7 +52,7 @@ struct ImagePlacementTests {
     @Test func movingAndRotatingAnImageIsAnEdit() async throws {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
-        let placement = try await placeImage(on: fixture)
+        let placement = try await fixture.store.placeTestImage(on: fixture.pageID)
         let moved = PageRect(x: 10, y: 20, width: 480, height: 360)
 
         try await fixture.store.updateImagePlacement(
@@ -80,7 +73,7 @@ struct ImagePlacementTests {
     @Test func removingAnImageIsAnEditThatKeepsItsAsset() async throws {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
-        let placement = try await placeImage(on: fixture)
+        let placement = try await fixture.store.placeTestImage(on: fixture.pageID)
 
         try await fixture.store.removeImagePlacement(placement.id, fromPage: fixture.pageID, now: Self.later)
 
@@ -111,7 +104,7 @@ struct ImagePlacementTests {
     @Test func duplicatingAPageCopiesItsImagesAndSharesTheirAssets() async throws {
         let fixture = try NotebookFixture()
         defer { fixture.remove() }
-        let placement = try await placeImage(on: fixture)
+        let placement = try await fixture.store.placeTestImage(on: fixture.pageID)
 
         let copy = try #require(try await fixture.store.duplicatePage(fixture.pageID))
 

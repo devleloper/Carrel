@@ -25,6 +25,11 @@ public struct NotebookManifest: Hashable, Codable, Sendable {
         pages.filter(\.isInTrash).sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
     }
 
+    /// The image assets the pages show, including pages in the Trash.
+    var imageAssetIDs: Set<AssetID> {
+        Set(pages.flatMap { $0.imagePlacements.map(\.assetID) })
+    }
+
     func pageIndex(of id: Page.ID) -> Int? {
         pages.firstIndex { $0.id == id }
     }
@@ -88,6 +93,14 @@ extension NotebookManifest {
         }
         pages.append(copy)
         return copy
+    }
+
+    /// Removes the pages that have been in the Trash since before `cutoff` and returns their IDs.
+    @discardableResult
+    mutating func removePages(expiredBefore cutoff: Date) -> Set<Page.ID> {
+        let expired = Set(pages.filter { ($0.deletedAt ?? .distantFuture) < cutoff }.map(\.id))
+        pages.removeAll { expired.contains($0.id) }
+        return expired
     }
 
     /// Moves a page `offset` places in reading order, ignoring pages in the Trash.

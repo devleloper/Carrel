@@ -12,6 +12,8 @@ enum VersionedFile {
         let value: Value
         /// Older than the current version when `value` was migrated on reading.
         let schemaVersion: Int
+        /// Whether a newer generation was missing or damaged, so `value` comes from an older one.
+        var isFallback = false
     }
 
     /// Decodes the first readable generation in `urls`, migrated to the current schema.
@@ -27,11 +29,11 @@ enum VersionedFile {
         movingDamagedTo recoveredDirectory: URL? = nil
     ) throws -> Generation<Value> {
         var damaged: [URL] = []
-        for url in urls {
+        for (index, url) in urls.enumerated() {
             guard let data = try? Data(contentsOf: url) else {
                 continue
             }
-            let generation: Generation<Value>
+            var generation: Generation<Value>
             do {
                 generation = try decodeGeneration(type, from: data, migration: migration)
             } catch VersionedFileError.newerSchema {
@@ -43,6 +45,7 @@ enum VersionedFile {
             if let recoveredDirectory {
                 damaged.forEach { FileManager.default.quarantine($0, in: recoveredDirectory) }
             }
+            generation.isFallback = index > 0
             return generation
         }
         throw VersionedFileError.unreadable

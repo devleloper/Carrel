@@ -78,7 +78,11 @@ Application Support/Carrel/
 - Ink written by a newer PencilKit opens read-only and is never rewritten.
 - An imported image is downscaled to at most 4096 px on its long side, stored as HEIC without the original's
   metadata and named by the SHA-256 of the file, so importing it again reuses the file. The file is on disk
-  before a page references it.
+  before a page references it. The Trash purge deletes assets that no page uses, counting pages in the Trash and
+  the previous generation of the manifest, so a fallback to it never finds an image missing; if that generation
+  cannot be read, nothing is deleted. Assets imported or taken off a page since launch are kept until the app
+  quits, so undo can bring an image back. When a manifest falls back to its previous generation, the images only
+  the lost one showed move to `Recovered/` with it.
 - A notebook package that cannot be read stays where it is; the library reports it instead of hiding it.
 - A manifest of an older schema version is migrated in memory, in steps over its JSON before decoding, and
   reaches the disk in the new version only with the next change. The library snapshots such a notebook when it

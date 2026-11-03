@@ -13,13 +13,30 @@ struct VersionedFileTests {
         try JSONCoding.encode(LibraryManifest()).write(to: previous)
         try Data("{ damaged".utf8).write(to: current)
 
-        let manifest = try VersionedFile.read(
+        let generation = try VersionedFile.read(
             LibraryManifest.self,
             from: [current, previous],
             migration: LibraryManifest.migration
-        ).value
+        )
 
-        #expect(manifest == LibraryManifest())
+        #expect(generation.value == LibraryManifest())
+        #expect(generation.isFallback)
+    }
+
+    @Test func theCurrentGenerationIsNotAFallback() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let current = directory.appending(path: "library.json")
+        try JSONCoding.encode(LibraryManifest()).write(to: current)
+
+        let generation = try VersionedFile.read(
+            LibraryManifest.self,
+            from: [current, directory.appending(path: "library.json.previous")],
+            migration: LibraryManifest.migration
+        )
+
+        #expect(!generation.isFallback)
+        #expect(generation.schemaVersion == LibraryManifest.currentSchemaVersion)
     }
 
     @Test func aFileFromANewerAppIsNeverSkipped() throws {

@@ -78,6 +78,21 @@ struct NotebookFixture {
     }
 }
 
+extension NotebookStore {
+    /// Imports a test image of the given size and places it on a page. Different sizes give different assets.
+    func placeTestImage(
+        width: Int = 640,
+        height: Int = 480,
+        on pageID: Page.ID,
+        now: Date = .now
+    ) async throws -> ImagePlacement {
+        let image = try await importImage(TestImage.png(width: width, height: height))
+        let placement = ImagePlacement(assetID: image.assetID, frame: PageRect(x: 72, y: 96, width: 240, height: 180))
+        try addImagePlacement(placement, toPage: pageID, now: now)
+        return placement
+    }
+}
+
 enum TestImageError: Error {
     case cannotDraw
     case cannotEncode

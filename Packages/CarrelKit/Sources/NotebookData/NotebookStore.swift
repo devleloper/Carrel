@@ -53,6 +53,9 @@ public actor NotebookStore {
     private var writtenInkHashes: [Page.ID: InkHash] = [:]
     private var readOnlyPages: Set<Page.ID> = []
     private var hasUnwrittenManifestChanges = false
+    /// Assets imported, or shown on a page that changed, while this store is open. A purge keeps them: the editor
+    /// places an import with a second call, and undo can put a removed image back.
+    private var assetsInUseThisSession: Set<AssetID> = []
 
     private init(
         package: NotebookPackage,
@@ -97,6 +100,9 @@ public actor NotebookStore {
         let package = NotebookPackage(url: url)
         let loaded = try loadManifest(of: package, movingDamagedTo: recoveredDirectory)
         var manifest = loaded.value
+        if loaded.isFallback {
+            setAsideImages(notShownIn: manifest, of: package, in: recoveredDirectory)
+        }
         if adoptOrphanInk(in: package, into: &manifest, now: now) {
             try VersionedFile.write(manifest, to: package.manifestURL, keepingPreviousAt: package.previousManifestURL)
         }
@@ -129,6 +135,22 @@ public actor NotebookStore {
             throw NotebookStoreError.schemaNewerThanApp
         } catch {
             throw NotebookStoreError.manifestUnreadable
+        }
+    }
+
+    /// The lost newer generation may have shown images the older one does not know. They go to the recovery folder
+    /// with it, where nothing deletes them, instead of waiting in the package for a purge to find them unused.
+    private static func setAsideImages(
+        notShownIn manifest: NotebookManifest,
+        of package: NotebookPackage,
+        in recoveredDirectory: URL
+    ) {
+        let shown = manifest.imageAssetIDs
+        for url in FileManager.default.directoryContents(at: package.assetsDirectory) {
+            guard let assetID = NotebookPackage.assetID(ofImageFile: url), !shown.contains(assetID) else {
+                continue
+            }
+            FileManager.default.quarantine(url, in: recoveredDirectory)
         }
     }
 
@@ -291,6 +313,7 @@ public actor NotebookStore {
             return
         }
         var placements = manifest.pages[pageIndex].imagePlacements
+        assetsInUseThisSession.formUnion(placements.map(\.assetID))
         change(&placements)
         guard placements != manifest.pages[pageIndex].imagePlacements else {
             return
@@ -306,6 +329,7 @@ public actor NotebookStore {
         guard let assetID = AssetID(rawValue: SHA256.hexDigest(of: heic)) else {
             throw NotebookStoreError.imageEncodingFailed
         }
+        assetsInUseThisSession.insert(assetID)
         let url = package.imageURL(for: assetID)
         guard (try? Data(contentsOf: url)) != heic else {
             return assetID
@@ -405,19 +429,57 @@ public actor NotebookStore {
         return updated.notebook
     }
 
-    /// Permanently removes pages that have been in the Trash since before `cutoff`.
+    /// Permanently removes pages that have been in the Trash since before `cutoff`, then the images no page shows
+    /// any more.
     func purgePages(deletedBefore cutoff: Date) throws {
-        let expired = Set(manifest.pages.filter { ($0.deletedAt ?? .distantFuture) < cutoff }.map(\.id))
-        guard !expired.isEmpty else {
+        var updated = manifest
+        let expired = updated.removePages(expiredBefore: cutoff)
+        if !expired.isEmpty {
+            try writeManifest(updated)
+            for pageID in expired {
+                try? FileManager.default.removeItem(at: package.inkURL(for: pageID))
+                try? FileManager.default.removeItem(at: package.previousInkURL(for: pageID))
+            }
+        }
+        removeUnusedImageAssets(keepingPagesFrom: cutoff)
+    }
+
+    /// Deletes image assets that no kept page shows, in the Trash or out of it, in either generation of the manifest,
+    /// so falling back to the previous generation never finds an image missing. Expired pages do not count: their
+    /// ink is deleted as well. Files go only after the manifest that stopped using them is written, so a crash leaves
+    /// at most an unused file for the next purge.
+    private func removeUnusedImageAssets(keepingPagesFrom cutoff: Date) {
+        guard let shownByPrevious = imageAssetIDsOfPreviousManifest(keepingPagesFrom: cutoff) else {
             return
         }
-        var updated = manifest
-        updated.pages.removeAll { expired.contains($0.id) }
-        try writeManifest(updated)
-        for pageID in expired {
-            try? FileManager.default.removeItem(at: package.inkURL(for: pageID))
-            try? FileManager.default.removeItem(at: package.previousInkURL(for: pageID))
+        let used = assetsInUseThisSession.union(manifest.imageAssetIDs).union(shownByPrevious)
+        for url in FileManager.default.directoryContents(at: package.assetsDirectory) {
+            guard let assetID = NotebookPackage.assetID(ofImageFile: url), !used.contains(assetID) else {
+                continue
+            }
+            try? FileManager.default.removeItem(at: url)
         }
+    }
+
+    /// The images the previous generation of the manifest shows on pages kept at `cutoff`, or `nil` when it exists
+    /// but cannot be read and what it shows is unknown.
+    private func imageAssetIDsOfPreviousManifest(keepingPagesFrom cutoff: Date) -> Set<AssetID>? {
+        let url = package.previousManifestURL
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) else {
+            return []
+        }
+        guard
+            let data = try? Data(contentsOf: url),
+            var previous = try? VersionedFile.decode(
+                NotebookManifest.self,
+                from: data,
+                migration: NotebookManifest.migration
+            )
+        else {
+            return nil
+        }
+        previous.removePages(expiredBefore: cutoff)
+        return previous.imageAssetIDs
     }
 
     // MARK: Private
