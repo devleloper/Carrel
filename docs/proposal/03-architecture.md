@@ -1,8 +1,8 @@
 # Product Proposal — Часть 3. Архитектура
 
-> Черновик для обсуждения, 27.10.2026. Рабочее название — **Carrel** ([часть 1](01-product.md)). Метки релизов **MVP**, **1.0** и **Future** — как в части 1; AI-функции выходят в 1.1, первом релизе после 1.0. Минимальная система — iPadOS 27.
+> Одобрено на гейте Г1 ([ADR 0001](../adr/0001-adopt-proposal-architecture.md)); черновик от 27.10.2026. Название — **Carrel** ([часть 1](01-product.md)). Метки релизов **MVP**, **1.0** и **Future** — как в части 1; AI-функции выходят в 1.1, первом релизе после 1.0. Минимальная система — iPadOS 27.
 >
-> Имя продукта не утверждено, поэтому в именах таргета, схемы и пакета стоит плейсхолдер `AppName` / `AppNameKit`. Идентификаторы от имени не зависят: bundle ID `dev.devlet.notebook`, UTType `dev.devlet.notebook.package` и iCloud-контейнер `iCloud.dev.devlet.notebook` не меняются никогда, даже при смене названия ([раздел 9](#9-структура-проекта)). Модули, названные по предметной области (`NotebookDomain`, `NotebookData`), от имени продукта тоже не зависят.
+> Таргет, схема и пакет называются по продукту: `Carrel` и `CarrelKit`. Идентификаторы от имени не зависят: bundle ID `dev.devlet.notebook`, UTType `dev.devlet.notebook.package` и iCloud-контейнер `iCloud.dev.devlet.notebook` не меняются никогда, даже при смене названия ([раздел 9](#9-структура-проекта)). Модули, названные по предметной области (`NotebookDomain`, `NotebookData`), от имени продукта тоже не зависят.
 
 ## 8. Архитектура и технологический стек
 
@@ -31,7 +31,7 @@
 | Unit- и интеграционные тесты | Swift Testing | Параметризация, теги, пакет тестируется `swift test` на macOS-хосте без симулятора | XCTest для unit-тестов |
 | UI- и performance-тесты | XCTest: `XCUIApplication`, `measure` + `XCTMetric` | Swift Testing не покрывает UI и метрики | Сторонние UI-фреймворки |
 | Стиль кода | `swift-format` из тулчейна, `.swift-format` в корне и свой в папках тестов | Ноль дополнительных инструментов, встроен в Xcode, одна версия на Linux и macOS | SwiftLint (Homebrew или плагин-зависимость), nicklockwood/SwiftFormat (второй форматтер) |
-| Описание проекта | Коммитим `AppName.xcodeproj` с folder-synchronized groups, настройки — в `.xcconfig` | Добавление файлов не меняет проектный файл, настройки проверяются на ревью как текст, «открыл и запустил» без генераторов | XcodeGen, Tuist: лишний инструмент у каждого участника и в CI, сгенерированный проект в `.gitignore` |
+| Описание проекта | Коммитим `Carrel.xcodeproj` с folder-synchronized groups, настройки — в `.xcconfig` | Добавление файлов не меняет проектный файл, настройки проверяются на ревью как текст, «открыл и запустил» без генераторов | XcodeGen, Tuist: лишний инструмент у каждого участника и в CI, сгенерированный проект в `.gitignore` |
 | CI | GitHub Actions: раннер `xcode-27` для сборки и тестов, `ubuntu-24.04` для линта | Для публичного репозитория стандартные раннеры бесплатны и без лимита минут. Образ `xcode-27` на момент исследования был в public preview в runner-images: ярлык подтверждаем в И0, запасной путь — образ macOS с Xcode 27, выбранным через `xcode-select` | Bitrise, CircleCI. Xcode Cloud — только для релизов после вступления в Developer Program |
 
 ### 8.2 Архитектурный обзор
@@ -45,12 +45,12 @@
 
 ```mermaid
 flowchart TB
-    subgraph AppTarget["App target: AppName"]
+    subgraph AppTarget["App target: Carrel"]
         App["App<br/>composition root, сцены, меню"]
         Features["Features<br/>SwiftUI + @Observable, UIKit-редактор"]
         Services["Services<br/>PencilKit, распознавание, Spotlight"]
     end
-    subgraph Kit["Swift package: AppNameKit"]
+    subgraph Kit["Swift package: CarrelKit"]
         Data["NotebookData<br/>хранилища, индекс, резервная копия"]
         Media["NotebookMedia (1.0)<br/>запись звука, тайлы PDF"]
         Assistant["NotebookAssistant (1.1)<br/>AI-провайдеры"]
@@ -86,17 +86,17 @@ flowchart TB
 | Миниатюры, запись звука, Spotlight | Нет | Одна реализация; проверяются на симуляторе и устройстве |
 | Разрешение конфликтов синхронизации (1.0) | Нет | Слияние метаданных и тегов — чистая функция в `NotebookSync`, тестируется `swift test` без серверов CloudKit; сам движок — конкретный тип |
 
-**Модули.** Один app target и один локальный пакет `Packages/AppNameKit`:
+**Модули.** Один app target и один локальный пакет `Packages/CarrelKit`:
 
 | Модуль | Платформы | Зачем отдельный |
 |---|---|---|
-| `AppName` (app target) | iPadOS 27 | UI, редактор, платформенные адаптеры; изоляция по умолчанию — `MainActor` |
+| `Carrel` (app target) | iPadOS 27 | UI, редактор, платформенные адаптеры; изоляция по умолчанию — `MainActor` |
 | `NotebookDomain` | iOS 27, macOS 26 | Компилятор не даёт Domain импортировать хранилище или UI |
 | `NotebookData` | iOS 27, macOS 26 | Самая ценная логика (формат, восстановление, резервная копия, индекс) тестируется `swift test` на macOS-хосте за секунды |
 | `NotebookMedia` (1.0) | iOS 27, macOS 26 | Запись звука и тайлы PDF: их колбэки приходят на чужих потоках, а изоляция по умолчанию `nonisolated` не даёт компилятору привязать их к главному актору ([ADR-14](#adr-14-модель-конкурентности)) |
 | `NotebookAssistant` (1.1) | iOS 27, macOS 26 | Изолирует сеть, ключ и FoundationModels; появляется вместе с AI-функциями |
 | `NotebookSync` (1.0) | iOS 27, macOS 26 | CloudKit, записи и слияние метаданных; появляется вместе с синхронизацией |
-| `AppNameControls` (1.0, расширение WidgetKit) | iPadOS 27 | `ControlWidget` «Quick Note» в Пункте управления. Его intent открывает приложение и выполняется в процессе приложения, поэтому App Group и координация файлов не нужны |
+| `CarrelControls` (1.0, расширение WidgetKit) | iPadOS 27 | `ControlWidget` «Quick Note» в Пункте управления. Его intent открывает приложение и выполняется в процессе приложения, поэтому App Group и координация файлов не нужны |
 
 Платформы пакета объявлены один раз в `Package.swift`: `.iOS(.v27)` и `.macOS(.v26)`. macOS указан только ради быстрых тестов на хосте, и именно 26: Xcode 27 работает на macOS Tahoe 26.6, и `swift test` не должен требовать обновления Mac. Немногие вызовы, которым на macOS нужен SDK 27 (например, `installAudioTap` в `NotebookMedia`), закрыты `#if os(iOS)`; на iPad веток по версии ОС нет. Приложение выходит только на iPad. Фичи не выносим в модули: UI-код всё равно тестируется на симуляторе, поэтому скорости тестов это не добавит, а `public`-boilerplate и накладные расходы Xcode вырастут. Пересмотрим, когда появится второй разработчик на одной фиче или инкрементальная сборка станет мешать работе. Расширение Пункта управления этого не требует: ему нужен только один intent, который компилируется в оба таргета.
 
@@ -459,7 +459,7 @@ public enum AssistantImageRoute: Equatable, Sendable {
 - Пакет: изоляция по умолчанию `nonisolated`, включены `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `ExistentialAny`, `MemberImportVisibility`.
 - Акторы: `LibraryStore` (библиотека; выдаёт ровно один `NotebookStore` на блокнот на весь процесс), `NotebookStore`, `ThumbnailRenderer`, в 1.0 — `Catalog` (одно SQLite-соединение в WAL) и `SearchIndexer`.
 - Тяжёлые вычисления (кодирование `PKDrawing`, подготовка рисунка к распознаванию) — `@concurrent` функции. `PKDrawing` — `Sendable`, поэтому значение захватывается на main и уходит в фон без копирования на нашей стороне.
-- Системные колбэки вне главного потока живут только в nonisolated-коде: tap аудио, рисование тайлов PDF и блоки-аксессоры `NSFileCoordinator`, если он появится ([8.9](#89-что-мы-сознательно-не-делаем)). В app target с изоляцией `MainActor` такое замыкание или override вывелись бы как `@MainActor`, и проверка изоляции в рантайме (SE-0423) уронила бы приложение на чужом потоке, хотя сборка прошла бы чисто. Поэтому в 1.0 запись звука и тайловый рендер живут в `NotebookMedia`, и каждый такой колбэк покрыт тестом на устройстве в `AppNameTests`:
+- Системные колбэки вне главного потока живут только в nonisolated-коде: tap аудио, рисование тайлов PDF и блоки-аксессоры `NSFileCoordinator`, если он появится ([8.9](#89-что-мы-сознательно-не-делаем)). В app target с изоляцией `MainActor` такое замыкание или override вывелись бы как `@MainActor`, и проверка изоляции в рантайме (SE-0423) уронила бы приложение на чужом потоке, хотя сборка прошла бы чисто. Поэтому в 1.0 запись звука и тайловый рендер живут в `NotebookMedia`, и каждый такой колбэк покрыт тестом на устройстве в `CarrelTests`:
   - tap ставится через `installAudioTap(onBus:bufferSize:format:tapProvider:)` с `@Sendable`-замыканием (`installTap` в iPadOS 27 deprecated); замыкание только пишет буфер в `AVAudioFile` и не обращается к акторам синхронно;
   - тайловый слой — подкласс `CATiledLayer` с `nonisolated override func draw(in:)`, который трогает только неизменяемое или защищённое блокировкой состояние.
 - Окна. В MVP сцена одна (`UIApplicationSupportsMultipleScenes = NO`), при этом размер окна меняется как у любого приложения iPadOS. В 1.0 окон несколько, но у блокнота одно редактируемое представление: открытие уже открытого блокнота выводит вперёд его окно (`WindowGroup(for: Notebook.ID.self)` + `openWindow(value:)`). `EditorSessionRegistry` (MainActor, 1.0) существует только для этого правила: если блокнот открыт в главном окне, а пользователь открывает его в отдельном, редактор главного окна сначала сбрасывает изменения и закрывается. Настоящее редактирование одного блокнота в нескольких окнах вне объёма: для него нужен отдельный ADR — сеанс как источник истины страницы, зеркалирование штрихов в живые канвасы других окон и свой стек отмены у каждого окна.
@@ -470,7 +470,7 @@ public enum AssistantImageRoute: Equatable, Sendable {
 
 #### ADR-15. Внедрение зависимостей
 
-**Решение.** Композиционный корень `AppDependencies` (`@Observable final class`, изолирован на `MainActor` настройкой таргета) создаётся один раз в `AppNameApp` из `AppDirectories` и передаётся в сцены через `.environment(_:)`. Сцена создаёт модели фич и передаёт им зависимости явно через `init`, так что зависимости видны в сигнатуре. Для тестов, превью и UI-тестов есть `AppDirectories.temporary()` и аргумент запуска, который подставляет чистую библиотеку с фикстурами. Сервис-локаторы и DI-контейнеры не используем.
+**Решение.** Композиционный корень `AppDependencies` (`@Observable final class`, изолирован на `MainActor` настройкой таргета) создаётся один раз в `CarrelApp` из `AppDirectories` и передаётся в сцены через `.environment(_:)`. Сцена создаёт модели фич и передаёт им зависимости явно через `init`, так что зависимости видны в сигнатуре. Для тестов, превью и UI-тестов есть `AppDirectories.temporary()` и аргумент запуска, который подставляет чистую библиотеку с фикстурами. Сервис-локаторы и DI-контейнеры не используем.
 
 **Последствия.** Граф объектов (около десяти сервисов) читается в одном файле. Ошибка в зависимостях проявляется при компиляции, а не в рантайме.
 
@@ -706,7 +706,7 @@ Library/Caches/
 | Уровень | Инструмент | Где запускается | Что покрываем |
 |---|---|---|---|
 | Domain и Data | Swift Testing | `swift test` на macOS-хосте при каждом push | Round-trip манифеста и конверта; golden-пакеты каждой схемы; порча файла чернил (усечение, бит-флип, пустой файл, чужой magic) с откатом к `.previous`; отдельно — более новая `requiredContentVersion`: `.requiresNewerSystem`, только чтение, файл байт в байт прежний после попытки правки; пропавший `.ink` при `hasInk == true` и одинокий `.ink.previous`; осиротевший `.ink`; порядок «манифест первым»; round-trip резервной копии `.aar`; политика автосохранения, статусы сохранения и пропуск записи с тем же хешем; `SortKey`; индекс названий; нормализация поиска (регистр, диакритика, `ё → е`); в 1.0 — слияние тегов, пересборка каталога, математика сегментов аудио |
-| Платформенные адаптеры | Swift Testing в `AppNameTests` | Симулятор iPad; колбэки `NotebookMedia` — устройство | `PKDrawing` ↔ `InkData`, потолок `.version5`, миниатюры в светлой и тёмной теме, сброс сеанса на `.inactive`; в 1.0 — `PKStrokeRecognizer` на латинице, tap аудио и тайлы PDF на чужих потоках, перенос страницы с записью в другой блокнот: тап по штриху играет правильное место |
+| Платформенные адаптеры | Swift Testing в `CarrelTests` | Симулятор iPad; колбэки `NotebookMedia` — устройство | `PKDrawing` ↔ `InkData`, потолок `.version5`, миниатюры в светлой и тёмной теме, сброс сеанса на `.inactive`; в 1.0 — `PKStrokeRecognizer` на латинице, tap аудио и тайлы PDF на чужих потоках, перенос страницы с записью в другой блокнот: тап по штриху играет правильное место |
 | Ключевые сценарии | XCTest UI | Симулятор, по расписанию и вручную | Создать блокнот → писать пальцем (Debug-флаг `.anyInput`) → перезапустить и проверить; отмена касанием двумя пальцами при `.anyInput`; переименование, папки; поиск по названиям; удаление и Restore из Trash; `terminate()` внутри окна автосохранения; `XCUIApplication.performAccessibilityAudit()` на ключевых экранах; импорт PDF (1.0) |
 | Производительность | XCTest `measure` | Устройство (бюджеты), симулятор (регрессии) | Запуск, открытие 300 страниц, скролл, память; PDF на 1000 страниц (1.0) |
 
@@ -813,9 +813,9 @@ struct InkRecoveryTests {
 
 ```text
 notebook/
-├── AppName.xcodeproj/                 # проект; группы синхронизированы с папками, настройки в xcconfig
-├── AppName/                           # app target (folder-synchronized group)
-│   ├── App/                           # AppNameApp, AppDependencies, сцены, команды меню, App Intents
+├── Carrel.xcodeproj/                  # проект; группы синхронизированы с папками, настройки в xcconfig
+├── Carrel/                            # app target (folder-synchronized group)
+│   ├── App/                           # CarrelApp, AppDependencies, сцены, команды меню, App Intents
 │   ├── Features/
 │   │   ├── Library/                   # библиотека: папки, теги, обложки
 │   │   ├── Editor/                    # интерфейс вокруг холста на SwiftUI + UIKit-редактор и пул канвасов
@@ -831,11 +831,11 @@ notebook/
 │       ├── Localizable.xcstrings      # все строки UI
 │       ├── InfoPlist.xcstrings        # строки Info.plist
 │       └── PrivacyInfo.xcprivacy
-├── AppNameControls/                   # 1.0: расширение WidgetKit с ControlWidget «Quick Note»; intent общий с app target
-├── AppNameTests/                      # Swift Testing на симуляторе и устройстве: PencilKit, UIKit, адаптеры, колбэки NotebookMedia
-├── AppNameUITests/                    # XCTest: UI-сценарии, performance, аудит доступности
+├── CarrelControls/                    # 1.0: расширение WidgetKit с ControlWidget «Quick Note»; intent общий с app target
+├── CarrelTests/                       # Swift Testing на симуляторе и устройстве: PencilKit, UIKit, адаптеры, колбэки NotebookMedia
+├── CarrelUITests/                     # XCTest: UI-сценарии, performance, аудит доступности
 ├── Packages/
-│   └── AppNameKit/
+│   └── CarrelKit/
 │       ├── Package.swift              # .iOS(.v27), .macOS(.v26)
 │       ├── Sources/
 │       │   ├── NotebookDomain/
@@ -850,12 +850,12 @@ notebook/
 │   ├── Base.xcconfig                  # Swift 6, iPadOS 27.0, предупреждения
 │   ├── Debug.xcconfig
 │   ├── Release.xcconfig
-│   ├── AppName.xcconfig               # bundle ID, версия, Info.plist, entitlements, изоляция MainActor
-│   ├── AppNameControls.xcconfig       # 1.0
+│   ├── Carrel.xcconfig                # bundle ID, версия, Info.plist, entitlements, изоляция MainActor
+│   ├── CarrelControls.xcconfig        # 1.0
 │   ├── Tests.xcconfig
-│   ├── AppName-Info.plist             # UILaunchScreen, сцены, UTType, фоновые режимы
-│   ├── AppNameControls-Info.plist     # 1.0: NSExtension для WidgetKit
-│   └── AppName.entitlements
+│   ├── Carrel-Info.plist              # UILaunchScreen, сцены, UTType, фоновые режимы
+│   ├── CarrelControls-Info.plist      # 1.0: NSExtension для WidgetKit
+│   └── Carrel.entitlements
 ├── TestPlans/                         # Unit, UI, Sanitizers (.xctestplan)
 ├── Scripts/                           # lint.sh, test.sh: одни команды локально и в CI
 ├── .githooks/                         # commit-msg: формат Conventional Commits до push
@@ -886,9 +886,9 @@ notebook/
 
 `Info.plist` и entitlements лежат в `Config/`, вне синхронизированной папки, поэтому для них не нужны исключения членства, чтобы они не попали в ресурсы бандла. Ключи `UTExportedTypeDeclarations` и фоновые режимы неудобно выражать через `INFOPLIST_KEY_*`, поэтому Info.plist — обычный файл. Локальные переопределения (`DEVELOPMENT_TEAM` и т. п.) подключаются через `#include? "Secrets.xcconfig"`; этот файл уже в `.gitignore`.
 
-`.swift-format`: отступ 4 пробела, строка до 120 символов, `respectsExistingLineBreaks`, включены `NeverForceUnwrap`, `NeverUseForceTry`, `NeverUseImplicitlyUnwrappedOptionals`, `OrderedImports`, `UseEarlyExits`, `FileScopedDeclarationPrivacy`. Правила `AllPublicDeclarationsHaveDocumentation` и `BeginDocumentationCommentWithOneLineSummary` выключены: они толкают к комментариям, которые пересказывают код, а комментарии у нас объясняют только «почему». В `AppNameTests/`, `AppNameUITests/` и `Packages/AppNameKit/Tests/` лежит свой `.swift-format` — тот же, но без `NeverForceUnwrap` и `NeverUseForceTry`: swift-format берёт ближайший файл конфигурации вверх по дереву, а в тестах force unwrap — нормальный способ упасть на неверной фикстуре. Правила против `fatalError` в swift-format нет, поэтому `fatalError` и `preconditionFailure` в `NotebookData` ловит grep-шаг в `Scripts/lint.sh`.
+`.swift-format`: отступ 4 пробела, строка до 120 символов, `respectsExistingLineBreaks`, включены `NeverForceUnwrap`, `NeverUseForceTry`, `NeverUseImplicitlyUnwrappedOptionals`, `OrderedImports`, `UseEarlyExits`, `FileScopedDeclarationPrivacy`. Правила `AllPublicDeclarationsHaveDocumentation` и `BeginDocumentationCommentWithOneLineSummary` выключены: они толкают к комментариям, которые пересказывают код, а комментарии у нас объясняют только «почему». В `CarrelTests/`, `CarrelUITests/` и `Packages/CarrelKit/Tests/` лежит свой `.swift-format` — тот же, но без `NeverForceUnwrap` и `NeverUseForceTry`: swift-format берёт ближайший файл конфигурации вверх по дереву, а в тестах force unwrap — нормальный способ упасть на неверной фикстуре. Правила против `fatalError` в swift-format нет, поэтому `fatalError` и `preconditionFailure` в `NotebookData` ловит grep-шаг в `Scripts/lint.sh`.
 
-**Идентификаторы** задаются один раз в `AppName.xcconfig`, код читает их из `Bundle.main`, а не хардкодит. От названия продукта они не зависят:
+**Идентификаторы** задаются один раз в `Carrel.xcconfig`, код читает их из `Bundle.main`, а не хардкодит. От названия продукта они не зависят:
 
 | Что | Значение |
 |---|---|
@@ -911,7 +911,7 @@ notebook/
 - Строки — английский исходный текст как ключ в String Catalog с `comment:`, если контекст неочевиден. В пакете пользовательских строк нет.
 
 **Как добавить фичу.**
-1. Создать `AppName/Features/<Feature>/` с `<Feature>View` и `<Feature>Model`. Проектный файл не меняется: папка синхронизирована.
+1. Создать `Carrel/Features/<Feature>/` с `<Feature>View` и `<Feature>Model`. Проектный файл не меняется: папка синхронизирована.
 2. Зависимости модели передать через `init` из `AppDependencies`; новые сервисы зарегистрировать там же.
 3. Новая логика хранения — публичный API в `NotebookData` с тестами в пакете. Изменение формата — новая `schemaVersion`, шаг миграции и golden-фикстура.
 4. Пользовательские действия продублировать командами меню с сочетаниями клавиш; недоступные пункты приглушать, а не скрывать.
@@ -922,7 +922,7 @@ notebook/
 
 | Workflow | Триггер | Раннер | Что делает |
 |---|---|---|---|
-| `lint.yml` | push в `main`, `pull_request`, ручной запуск | `ubuntu-24.04` (Swift 6.4 предустановлен) | `Scripts/lint.sh`: `swift format lint --strict --recursive --parallel`; проверка сообщений коммитов в диапазоне push; запрет `TODO`/`FIXME` без ссылки на issue; запрет `fatalError` и `preconditionFailure` в `Packages/AppNameKit/Sources/NotebookData` |
+| `lint.yml` | push в `main`, `pull_request`, ручной запуск | `ubuntu-24.04` (Swift 6.4 предустановлен) | `Scripts/lint.sh`: `swift format lint --strict --recursive --parallel`; проверка сообщений коммитов в диапазоне push; запрет `TODO`/`FIXME` без ссылки на issue; запрет `fatalError` и `preconditionFailure` в `Packages/CarrelKit/Sources/NotebookData` |
 | `ci.yml` | push в `main`, `pull_request`, ручной запуск | `xcode-27`, `DEVELOPER_DIR` закреплён на точной версии Xcode; запасной путь — образ macOS с Xcode 27 через `xcode-select` | `swift test` пакета на хосте; `xcodebuild test` с планом `Unit` на `iPad Air 11-inch (M4)` iPadOS 27 и `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; вывод через `xcbeautify`; `.xcresult` выкладывается как артефакт на 14 дней |
 | `nightly.yml` | расписание, ручной запуск | `xcode-27` | Планы `UI` (включая `performAccessibilityAudit()`) и `Sanitizers` |
 
