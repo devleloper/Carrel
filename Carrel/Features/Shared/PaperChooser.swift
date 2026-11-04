@@ -37,6 +37,8 @@ struct PaperChooser: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("paperTiles")
     }
 
     private func tileGroup(_ title: LocalizedStringKey, @ViewBuilder tiles: () -> some View) -> some View {
